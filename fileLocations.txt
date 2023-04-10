@@ -1,0 +1,2 @@
+Format DISK with inodes: /clear/courses/comp421/pub/bin/mkyfs
+yalnix executable: /clear/courses/comp421/pub/bin/yalnix
