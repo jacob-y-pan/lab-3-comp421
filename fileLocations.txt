@@ -1,2 +1,3 @@
 Format DISK with inodes: /clear/courses/comp421/pub/bin/mkyfs
+Location in case we want to edit it: /clear/courses/comp421/pub/samples-lab3/mkyfs.c
 yalnix executable: /clear/courses/comp421/pub/bin/yalnix
