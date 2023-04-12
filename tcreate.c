@@ -1,17 +1,23 @@
 #include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 #include <comp421/yalnix.h>
 #include <comp421/iolib.h>
 
-/* After running this, try topen2 and/or tunlink2 */
-
 int
 main()
 {
-        printf("\n%d\n\n", Create("/foo"));
-        printf("\n%d\n\n", Create("/bar"));
-        printf("\n%d\n\n", Create("/foo"));
-        printf("\n%d\n\n", Create("/foo/zzz"));
+    int err;
+    write(2, "A\n", 2);
+    err = Create("/foo");
+    fprintf(stderr, "Create returned %d\n", err);
 
-        Shutdown();
+    Sync();
+    Delay(3);
+    fprintf(stderr, "Done with Sync\n");
+
+/*      Shutdown(); */
+
+    exit(0);
 }
