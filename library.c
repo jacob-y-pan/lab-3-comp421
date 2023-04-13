@@ -2,6 +2,13 @@
 #include <comp421/yalnix.h>
 #include <comp421/iolib.h>
 
+struct my_msg {
+    int data1;
+    int data2;
+    char data3[16];
+    void *ptr;
+};
+
 int Open(char *pathname) {
     (void) pathname;
     TracePrintf(0, "In open\n");
@@ -16,6 +23,7 @@ int Close(int fd) {
 
 int Create(char *pathname) {
     (void) pathname;
+    TracePrintf(0, "%d Size", sizeof(struct my_msg));
     TracePrintf(0, "In create\n");
     return 0;
 }
