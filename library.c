@@ -2,12 +2,7 @@
 #include <comp421/yalnix.h>
 #include <comp421/iolib.h>
 
-struct my_msg {
-    int data1;
-    int data2;
-    char data3[16];
-    void *ptr;
-};
+#include "yfs_header.h"
 
 int Open(char *pathname) {
     (void) pathname;
@@ -23,7 +18,8 @@ int Close(int fd) {
 
 int Create(char *pathname) {
     (void) pathname;
-    TracePrintf(0, "%d Size", sizeof(struct my_msg));
+    struct my_msg test_message = {.data1 = 1001, .data2 = 3};
+    Send((void *) &test_message, -FILE_SERVER);
     TracePrintf(0, "In create\n");
     return 0;
 }
