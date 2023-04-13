@@ -24,7 +24,7 @@
 #	For example, the Makefile will make test1 out of test1.c,
 #	if you have a file named test1.c in this directory.
 #
-TEST = test_create_read_write
+TEST = sample2
 
 #
 #	Define the list of everything to be made by this Makefile.
@@ -50,8 +50,8 @@ YFS_SRCS = yfs.c
 #	your YFS library, and IOLIB_SRCS should  be a list of the
 #	corresponding source files that make up your library.
 #
-IOLIB_OBJS = example3.o example4.o
-IOLIB_SRCS = example3.c example4.c
+IOLIB_OBJS = library.o
+IOLIB_SRCS = library.c
 
 #
 #	You should not have to modify anything else in this Makefile
