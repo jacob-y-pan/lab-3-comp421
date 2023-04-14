@@ -34,6 +34,7 @@ main(int argc, char **argv)
         num_blocks = main_fs_header->num_blocks;
         
         // Make num_inodes + 1 because fs_header
+        // 0 = free 1 = not free -1 = never can be free
         int free_inodes[num_inodes+1];
         // Mark 0th as not free (fs_header)
         free_inodes[0] = -1;
@@ -46,9 +47,10 @@ main(int argc, char **argv)
         // In case we need it: start of the data blocks
         int start_data_blocks = root_inode->direct[0];
         // Init free blocks - since concerned about only data blocks, just subtract those
+        // 0 = free 1 = not free -1 = never can be free
         int free_blocks[num_blocks - num_blocks_for_inodes];
-        // Curr byte pointer to see if went past block size - init to 1 * inode because first i node not free
-        int byte_pointer = sizeof(struct inode);
+        // Curr byte pointer to see if went past block size - init to inode because 0th node not free (fs_header)
+        int byte_pointer = sizeof(struct fs_header);
         int block_i = 2;
         int i;
         void *curr_block = first_block;
@@ -67,7 +69,7 @@ main(int argc, char **argv)
                 TracePrintf(0, "%dth inode is free\n", i);
                 free_inodes[i] = 0;
             } else {
-                free_inodes[i] = i;
+                free_inodes[i] = 1;
             }
 
             // Mark the free blocks as free or not - first go through direct
@@ -75,13 +77,24 @@ main(int argc, char **argv)
             int *direct_from_inode = (int *) curr_inode->direct;
             for (j = 0; j < NUM_DIRECT; j++) {
                 if (direct_from_inode[j] != 0) {
-                    free_blocks[direct_from_inode[j]] = direct_from_inode[j];
+                    free_blocks[direct_from_inode[j]] = 1;
                 } else {
                     free_blocks[direct_from_inode[j]] = 0;
                 }
             }
             // Then go through the block of indirect
-            
+            int indirect_block_num = curr_inode->indirect;
+            if (indirect_block_num != 0) {
+                free_blocks[indirect_block_num] = indirect_block_num;
+                void *temp_block_for_indirect = malloc(BLOCKSIZE);
+                ReadSector(indirect_block_num, temp_block_for_indirect);
+                // Iterate through all the blocks in indirect
+                for (j = 0; j < BLOCKSIZE / (int) sizeof(int); j++) {
+                    int curr_block_num = *((int *) (temp_block_for_indirect + j * sizeof(int)));
+                    TracePrintf(0, "Indirect blocked used up: %d\n");
+                    free_blocks[curr_block_num] = 1;
+                }
+            }
         }
 
         (void) free_blocks;
