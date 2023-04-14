@@ -1,0 +1,3 @@
+Attack plan: https://piazza.com/class/lc5hj93vhlm59s/post/691
+Inode free list: https://piazza.com/class/lc5hj93vhlm59s/post/698
+Printing what's on DISK: https://piazza.com/class/lc5hj93vhlm59s/post/740
