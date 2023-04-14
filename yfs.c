@@ -65,7 +65,7 @@ main(int argc, char **argv)
         int i;
         // TODO: Check indirect free blocks work
         void *curr_block = malloc(BLOCKSIZE);
-        curr_block = first_block;
+        memcpy(curr_block, first_block, BLOCKSIZE);
         for (i = 1; i < num_inodes+1; i++) {
             // If byte pointer past block size, get the next block
             if (byte_pointer > BLOCKSIZE) {
@@ -145,7 +145,7 @@ main(int argc, char **argv)
                 // TODO: Handle folders, rn just copying into root
 
                 // Begin at root node
-                if (pathname[0] == '/') {
+                if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
                     // Assume is just file and doesn't already exist
                     struct dir_entry entry_to_ins = {.inum = find_free_inode((int *) free_inodes)};
                     // copy pathname to the entry
@@ -155,7 +155,7 @@ main(int argc, char **argv)
                         memset(entry_to_ins.name + sizeof(pathname), '\0', DIRNAMELEN - sizeof(pathname));
                     }
                     // Edit root inode page and root inode
-                    struct inode *root_inode = (struct inode *) (curr_block + sizeof(struct fs_header));
+                    TracePrintf(0, "Block id: %d\n", (int) root_inode->direct[0]);
                     void *block_to_edit = malloc(BLOCKSIZE);
                     if ((c = ReadSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
                         return ERROR;
@@ -166,7 +166,7 @@ main(int argc, char **argv)
                     for (j = 0; j < num_dir_entries; j++) {
                         struct dir_entry *curr_dir_entry = (struct dir_entry *) (block_to_edit + j * sizeof(struct dir_entry));
                         if (curr_dir_entry->inum == 0) { // This means this dir is free
-                            TracePrintf(0, "Found an empty dir entry, inserting");
+                            TracePrintf(0, "Found an empty dir entry, inserting\n");
                             curr_dir_entry->inum = entry_to_ins.inum;
                             memcpy(curr_dir_entry->name, entry_to_ins.name, DIRNAMELEN);
                             break;
@@ -174,7 +174,7 @@ main(int argc, char **argv)
                     }
                     // If didn't find anything, append
                     if (j == num_dir_entries) {
-                        memcpy(block_to_edit + num_dir_entries, &entry_to_ins, sizeof(entry_to_ins));
+                        memcpy(block_to_edit + num_dir_entries * sizeof(struct dir_entry), &entry_to_ins, sizeof(entry_to_ins));
                         root_inode->size += sizeof(struct dir_entry);
                     }
                     // Write to the sector
