@@ -1,12 +1,13 @@
 #include <comp421/filesystem.h>
 #include <comp421/yalnix.h>
 #include <comp421/iolib.h>
+#include <string.h>
 
 #include "yfs_header.h"
 
 int Open(char *pathname) {
-    (void) pathname;
-    TracePrintf(0, "In open\n");
+    struct my_msg test_message = {.type = OPEN_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
     return 0;
 }
 
@@ -17,8 +18,7 @@ int Close(int fd) {
 }
 
 int Create(char *pathname) {
-    (void) pathname;
-    struct my_msg test_message = {.data1 = 1001, .data2 = 3};
+    struct my_msg test_message = {.type = CREATE_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     TracePrintf(0, "In create\n");
     return 0;

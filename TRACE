@@ -1,0 +1,53 @@
+** YFS      level 0 tracing enabled **
+YFS      Debug: Reading first block
+YFS      Fs_header values: num inodes: 47
+YFS      2th inode is free
+YFS      3th inode is free
+YFS      4th inode is free
+YFS      5th inode is free
+YFS      6th inode is free
+YFS      7th inode is free
+YFS      8th inode is free
+YFS      9th inode is free
+YFS      10th inode is free
+YFS      11th inode is free
+YFS      12th inode is free
+YFS      13th inode is free
+YFS      14th inode is free
+YFS      15th inode is free
+YFS      16th inode is free
+YFS      17th inode is free
+YFS      18th inode is free
+YFS      19th inode is free
+YFS      20th inode is free
+YFS      21th inode is free
+YFS      22th inode is free
+YFS      23th inode is free
+YFS      24th inode is free
+YFS      25th inode is free
+YFS      26th inode is free
+YFS      27th inode is free
+YFS      28th inode is free
+YFS      29th inode is free
+YFS      30th inode is free
+YFS      31th inode is free
+YFS      32th inode is free
+YFS      33th inode is free
+YFS      34th inode is free
+YFS      35th inode is free
+YFS      36th inode is free
+YFS      37th inode is free
+YFS      38th inode is free
+YFS      39th inode is free
+YFS      40th inode is free
+YFS      41th inode is free
+YFS      42th inode is free
+YFS      43th inode is free
+YFS      44th inode is free
+YFS      45th inode is free
+YFS      46th inode is free
+YFS      47th inode is free
+YFS      Client pid: 3
+YFS      file00
+YFS      parent
+YFS      6

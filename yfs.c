@@ -2,11 +2,15 @@
 #include <comp421/yalnix.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "yfs_header.h"
 
 int num_inodes;
 int num_blocks;
+
+// Store the current folder we're in (with inode)?
+int current_inode_directory;
 
 int
 main(int argc, char **argv)
@@ -25,7 +29,10 @@ main(int argc, char **argv)
         // Get first block
         TracePrintf(0, "Debug: Reading first block\n");
         void *first_block = malloc(BLOCKSIZE);
-        ReadSector(1, (void *) first_block);
+        int c;
+        if ((c = ReadSector(1, (void *) first_block)) == ERROR) {
+            return ERROR;
+        }
         // Get Fs_header
         struct fs_header *main_fs_header = (struct fs_header *) first_block;
         TracePrintf(0, "Fs_header values: num inodes: %d\n", main_fs_header->num_inodes);
@@ -57,7 +64,9 @@ main(int argc, char **argv)
         for (i = 1; i < num_inodes+1; i++) {
             // If byte pointer past block size, get the next block
             if (byte_pointer > BLOCKSIZE) {
-                ReadSector(block_i, curr_block);
+                if ((c = ReadSector(block_i, curr_block)) == ERROR) {
+                    return ERROR;
+                }
                 block_i++;
                 byte_pointer = 0;
             }
@@ -80,21 +89,63 @@ main(int argc, char **argv)
                     free_blocks[direct_from_inode[j]] = 1;
                 } else {
                     free_blocks[direct_from_inode[j]] = 0;
-                }
+                } 
             }
             // Then go through the block of indirect
             int indirect_block_num = curr_inode->indirect;
             if (indirect_block_num != 0) {
                 free_blocks[indirect_block_num] = indirect_block_num;
                 void *temp_block_for_indirect = malloc(BLOCKSIZE);
-                ReadSector(indirect_block_num, temp_block_for_indirect);
+                if ((c = ReadSector(indirect_block_num, temp_block_for_indirect)) == ERROR) {
+                    return ERROR;
+                }
+                
                 // Iterate through all the blocks in indirect
                 for (j = 0; j < BLOCKSIZE / (int) sizeof(int); j++) {
                     int curr_block_num = *((int *) (temp_block_for_indirect + j * sizeof(int)));
                     TracePrintf(0, "Indirect blocked used up: %d\n");
-                    free_blocks[curr_block_num] = 1;
+                    if (curr_block_num != 0)
+                        free_blocks[curr_block_num] = 1;
                 }
+                free(temp_block_for_indirect);
             }
+        }
+
+        // We are done building the free lists
+
+        // Set current directory as root
+        current_inode_directory = ROOTINODE;
+
+        // Receive from the client a message
+        struct my_msg *message = malloc(sizeof(struct my_msg));
+        int client_pid = Receive((void *) message);
+        TracePrintf(0, "Client pid: %d\n", client_pid);
+
+        int message_type = message->type;
+
+        char pathname[MAXPATHNAMELEN];
+        switch (message_type) {
+            case OPEN_M:
+                CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+
+                //Open correct folder();
+            
+            case CLOSE_M:
+            case CREATE_M:
+                // Try creating now
+                // Copy the pathname
+                CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                // Now have pathname, try to copy into the right folder
+                // TODO: Handle folders, rn just copying into root
+
+                // Begin at root node
+                if (pathname[0] == '/') {
+                    
+                }
+                
+
+                
+                break;
         }
 
         (void) free_blocks;
@@ -103,10 +154,9 @@ main(int argc, char **argv)
 
         // Free block holder
         free(curr_block);
-
-        struct my_msg *message = malloc(sizeof(struct my_msg));
+        
         TracePrintf(0, "parent\n");
-        Receive((void *) message);
+        
         TracePrintf(0, "%d\n", message->data1);
     }
 
