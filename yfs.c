@@ -12,6 +12,9 @@ int num_blocks;
 // Store the current folder we're in (with inode)?
 int current_inode_directory;
 
+// Functions
+int find_free_inode(int *free_inodes_arr);
+
 int
 main(int argc, char **argv)
 {
@@ -60,7 +63,9 @@ main(int argc, char **argv)
         int byte_pointer = sizeof(struct fs_header);
         int block_i = 2;
         int i;
-        void *curr_block = first_block;
+        // TODO: Check indirect free blocks work
+        void *curr_block = malloc(BLOCKSIZE);
+        curr_block = first_block;
         for (i = 1; i < num_inodes+1; i++) {
             // If byte pointer past block size, get the next block
             if (byte_pointer > BLOCKSIZE) {
@@ -112,6 +117,7 @@ main(int argc, char **argv)
         }
 
         // We are done building the free lists
+        free(curr_block);
 
         // Set current directory as root
         current_inode_directory = ROOTINODE;
@@ -140,7 +146,47 @@ main(int argc, char **argv)
 
                 // Begin at root node
                 if (pathname[0] == '/') {
-                    
+                    // Assume is just file and doesn't already exist
+                    struct dir_entry entry_to_ins = {.inum = find_free_inode((int *) free_inodes)};
+                    // copy pathname to the entry
+                    strncpy(entry_to_ins.name, pathname, sizeof(pathname));
+                    // add null terminators to end
+                    if (sizeof(pathname) < DIRNAMELEN) {
+                        memset(entry_to_ins.name + sizeof(pathname), '\0', DIRNAMELEN - sizeof(pathname));
+                    }
+                    // Edit root inode page and root inode
+                    struct inode *root_inode = (struct inode *) (curr_block + sizeof(struct fs_header));
+                    void *block_to_edit = malloc(BLOCKSIZE);
+                    if ((c = ReadSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
+                        return ERROR;
+                    }
+                    // Check if any dir_entries are 0
+                    int num_dir_entries = root_inode->size / sizeof(struct dir_entry);
+                    int j;
+                    for (j = 0; j < num_dir_entries; j++) {
+                        struct dir_entry *curr_dir_entry = (struct dir_entry *) (block_to_edit + j * sizeof(struct dir_entry));
+                        if (curr_dir_entry->inum == 0) { // This means this dir is free
+                            TracePrintf(0, "Found an empty dir entry, inserting");
+                            curr_dir_entry->inum = entry_to_ins.inum;
+                            memcpy(curr_dir_entry->name, entry_to_ins.name, DIRNAMELEN);
+                            break;
+                        }
+                    }
+                    // If didn't find anything, append
+                    if (j == num_dir_entries) {
+                        memcpy(block_to_edit + num_dir_entries, &entry_to_ins, sizeof(entry_to_ins));
+                        root_inode->size += sizeof(struct dir_entry);
+                    }
+                    // Write to the sector
+                    if ((c = WriteSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
+                        return ERROR;
+                    }
+                    // Write to the root inode
+                    // Write to the sector
+                    if ((c = WriteSector(ROOTINODE, first_block)) == ERROR) {
+                        return ERROR;
+                    }
+
                 }
                 
 
@@ -149,23 +195,30 @@ main(int argc, char **argv)
         }
 
         (void) free_blocks;
-        (void) free_inodes;
         (void) start_data_blocks;
 
+        // Free the current message
+        free(message);
+
         // Free block holder
-        free(curr_block);
-        
-        TracePrintf(0, "parent\n");
-        
-        TracePrintf(0, "%d\n", message->data1);
+        free(first_block);
     }
 
     return 0;
 }
 
 
-// // Function to find the next free inode
-// int find_free_inode() {
-//     int i;
-//     for (i = 0; i < )
-// }
+// Function to find the next free inode
+int find_free_inode(int *free_inodes_arr) {
+    int i;
+    TracePrintf(0, "Looking for a free inode\n");
+    // Start at 2 because root node is 1, 0 is fs_header
+    for (i = 2; i < (int) sizeof(free_inodes_arr); i++) {
+        if (free_inodes_arr[i] == 0) {
+            free_inodes_arr[i] = 1;
+            return i;
+        }
+    }
+    // no free inodes left, return error
+    return ERROR;
+}
