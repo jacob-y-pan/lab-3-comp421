@@ -12,8 +12,8 @@ main()
 {
         int fd;
 
-        // fd = Create("/file00");
-        Open("/file00");
+        fd = Create("/file00");
+        // Open("/file00");
 
         (void) fd;
 
