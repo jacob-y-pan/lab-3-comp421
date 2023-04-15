@@ -140,6 +140,7 @@ main(int argc, char **argv)
         char pathname[MAXPATHNAMELEN];
         switch (message_type) {
             case OPEN_M:
+                TracePrintf(0, "In open inside YFS\n");
                 CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
                 
                 // go down  root node
@@ -156,8 +157,10 @@ main(int argc, char **argv)
                 if (first_char == '/') { // absolute
                     // Use root inode
                     int inum_result = check_folder(ROOTINODE, token);
+                    TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                 }
-            
+
+                break;
             case CLOSE_M:
             case CREATE_M:
                 // Try creating now
@@ -171,7 +174,8 @@ main(int argc, char **argv)
                     // Assume is just file and doesn't already exist
                     struct dir_entry entry_to_ins = {.inum = find_free_inode((int *) free_inodes)};
                     // copy pathname to the entry
-                    strncpy(entry_to_ins.name, pathname, sizeof(pathname));
+                    char *token = strtok(pathname, "/");
+                    strncpy(entry_to_ins.name, token, strlen(token));
                     // add null terminators to end
                     if (sizeof(pathname) < DIRNAMELEN) {
                         memset(entry_to_ins.name + sizeof(pathname), '\0', DIRNAMELEN - sizeof(pathname));
@@ -211,10 +215,11 @@ main(int argc, char **argv)
                     }
 
                 }
-                
 
                 
                 break;
+            case MKDIR_M:
+                // TODO: Add '.' if have / at the end
         }
 
         (void) free_blocks;
@@ -240,6 +245,7 @@ int find_free_inode(int *free_inodes_arr) {
     for (i = 2; i < (int) sizeof(free_inodes_arr); i++) {
         if (free_inodes_arr[i] == 0) {
             free_inodes_arr[i] = 1;
+            TracePrintf(0, "Inode that we are gonna use: %d\n", i);
             return i;
         }
     }
@@ -257,6 +263,7 @@ int check_folder(int curr_inum, char *curr_pathname) {
     curr_pathname = strtok(NULL, "/");
     int reached_file = 0;
     // Check that is directory type
+    TracePrintf(0, "Current inode we're at: %d\n", curr_inum);
     if (curr_inode->type != INODE_DIRECTORY) {
         // Not a directory
         return ERROR;
@@ -270,16 +277,19 @@ int check_folder(int curr_inum, char *curr_pathname) {
 
     int num_dir_entries = curr_inode->size / sizeof(struct dir_entry);
     int curr_dir_index = 0;
+
+    // Go through direct entries first
     int i;
     for (i = 0; i < NUM_DIRECT; i++) {
+        TracePrintf(0, "Looking in direct\n");
         if (curr_inode->direct[i] == 0) {
             // Not a valid block -> we didn't find it. Return ERROR
             free(temp_pathname);
             return ERROR;
         } else {
-            
             // Check this current direct block for our folder
             void *current_block = malloc(BLOCKSIZE);
+            TracePrintf(0, "Current direct block we're at: %d\n", curr_inode->direct[i]);
             if ((c = ReadSector((int) curr_inode->direct[i], current_block)) == ERROR) {
                 free(current_block);
                 free(temp_pathname);
@@ -287,6 +297,7 @@ int check_folder(int curr_inum, char *curr_pathname) {
             }
 
             int j;
+            TracePrintf(0, "iterating through block with dir entries\n");
             for (j = 0; j < num_dir_entries; j++) {
                 // If went past the num_dir_entries in total, didn't find it
                 if (curr_dir_index >= num_dir_entries) {
@@ -297,6 +308,7 @@ int check_folder(int curr_inum, char *curr_pathname) {
                 curr_dir_index++;
                 struct dir_entry *curr_dir_entry = (struct dir_entry *) (current_block
                 + j * sizeof(struct dir_entry));
+                TracePrintf(0, "This dir entry: %s\n", curr_dir_entry->name);
                 // Compare entry with the current folder we're in
                 // Use strncmp because curr_dir_entry isn't null terminated
                 if (strncmp(curr_dir_entry->name, temp_pathname, strlen(temp_pathname)) == 0) {
@@ -309,8 +321,8 @@ int check_folder(int curr_inum, char *curr_pathname) {
                     } else {
                         TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
                         // Make sure is file
-                        struct inode *file_inode = (struct inode *) (first_block + 
-                        sizeof(struct fs_header) + curr_dir_entry->inum * sizeof(struct inode));
+                        struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                        TracePrintf(0, "Block number: %d\n", file_inode->direct[0]);
                         if (file_inode->type == INODE_REGULAR) {
                             free(current_block);
                             free(temp_pathname);
@@ -378,8 +390,7 @@ int check_folder(int curr_inum, char *curr_pathname) {
                 } else {
                     TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
                     // Make sure is file
-                    struct inode *file_inode = (struct inode *) (first_block + 
-                    sizeof(struct fs_header) + curr_dir_entry->inum * sizeof(struct inode));
+                    struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
                     if (file_inode->type == INODE_REGULAR) {
                         free(indirect_block);
                         free(temp_pathname);
