@@ -15,6 +15,12 @@ int current_inode_directory;
 // Functions
 int find_free_inode(int *free_inodes_arr);
 
+
+
+// Helper Functions
+
+
+
 int
 main(int argc, char **argv)
 {
@@ -133,6 +139,129 @@ main(int argc, char **argv)
         switch (message_type) {
             case OPEN_M:
                 CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                
+                // go down  root node
+                // check the path name one by one.
+                // then... open each file, create each file, open their blocks, check each
+                // blockk for the directory entries.
+                // check each block in NUM_DIRECT. TODO!! Test rest of blocks
+
+                // Check if absolute or relative
+                if (pathname[0] == '/') { // absolute
+                    // Use root inode
+                    struct inode *root_inode = (struct inode *) (first_block + sizeof(struct fs_header));
+                    
+                    // read blocks for that inode.
+                    int posInBlock = 0;
+                    w
+                    for (i = 0; i < NUM_DIRECT_BLOCKS; i++){
+                        if(root_inode->direct[i] == 0)
+                        {
+                            // not valid block.
+                            break;
+                        }
+                        else {
+                            void *current_block = malloc(BLOCKSIZE);
+                            if ((c = ReadSector((int) root_inode->direct[i], current_block)) == ERROR) {
+                                return ERROR;
+                            }
+
+                            // Check if any dir_entries are 0
+                            int num_dir_entries = root_inode->size / sizeof(struct dir_entry);
+                            if (num_dir_entries > BLOCKSIZE / sizeof(struct dir_entry)){
+                                // we need to check multiple blocks
+                            }
+                            int j;
+                            //check if there are any Entries matching the current one in current directory.
+                            for (j = 0; j < num_dir_entries; j++) {
+                                struct dir_entry *curr_dir_entry = (struct dir_entry *) (current_block + j * sizeof(struct dir_entry));
+
+                                //Verify that the Current Directory Entry is a file
+                                // OR verify if it's a directory. 
+                            
+                                //recursive bit
+                                
+                                if(!("/" , pathname, )) //or strtok pathname == 1;
+                                {
+                                     if(names are the same) {
+                                            return 1;// return the inode num;
+                                        }
+
+                                        else{
+                                             TracePrintf(0, "File not found, but there is directory. Returning... CURRENT DIRECTORY NO MATCHES");
+                                            continue;
+                                        }
+
+                                }
+
+                                else{
+                                    if(names match up){ //compare one character by one character. Check if pathname is null terminated. DIRNAME is not!
+                                        //name of directory is found, check next segment of directory.
+                                        return (strtok(1));
+                                    }
+                                    else{
+                                        TracePrintf(0, "Directory not found, but there are more direc_entries. Returning... CURRENT DIRECTORY NO MATCHES");
+                                        continue;
+                                    }
+                                }
+
+                                /**
+                                if(curr_dir_entry->inode->type == INODE_DIRECTORY)
+                                {
+                                    //check if pathname equals directory path name 
+                                    if(compareName(name, pathname, DIRNAMELEN))
+                                    {
+                                        //SUCESS! Found next diretory!
+                                        //?? call agin?
+                                    }
+                                    else{
+                                        //
+
+                                        if(compareNamed()){
+
+                                        }    
+                                        else{
+
+                                        }
+                                    }
+
+                                }
+                                else if(curr_dir_entry->inode->type == INODE_FREE) 
+                                {
+                                    //compareName
+
+                                    //      
+                                    //                  max String LENGTH
+                                    if(compareName(name, pathname, DIRNAMELEN)){
+                                        return 1;
+                                    }
+                                    else{
+                                        //if this is the last file
+                                        // return 0;
+
+                                        //else 
+                                        //
+                                    }
+                                }
+                                **/
+                                
+
+
+                            }
+                        }
+                    }
+                    
+                } else { // relative
+
+                }
+
+                
+                TracePrintf(0, "In OPEN: testing root_inode. Is there any diret blocks %d", root_inode.DIRECT_BLOCKS);
+                
+                root_inode.
+
+
+                //
 
                 //Open correct folder();
             
@@ -206,6 +335,7 @@ main(int argc, char **argv)
 
     return 0;
 }
+
 
 
 // Function to find the next free inode
