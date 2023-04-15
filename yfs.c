@@ -157,6 +157,7 @@ main(int argc, char **argv)
                     // Edit root inode page and root inode
                     TracePrintf(0, "Block id: %d\n", (int) root_inode->direct[0]);
                     void *block_to_edit = malloc(BLOCKSIZE);
+                    // TODO: See if all the direct blocks are full, check indirect
                     if ((c = ReadSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
                         return ERROR;
                     }
