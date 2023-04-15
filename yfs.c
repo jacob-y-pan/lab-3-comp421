@@ -12,10 +12,12 @@ int num_blocks;
 // Store the current folder we're in (with inode)?
 int current_inode_directory;
 
+// Store the first block since will always stay constant
+void *first_block;
+
 // Functions
 int find_free_inode(int *free_inodes_arr);
-
-
+int check_folder(int curr_inum, char *curr_pathname);
 
 // Helper Functions
 
@@ -37,7 +39,7 @@ main(int argc, char **argv)
         // ACTUAL PROCESS
         // Get first block
         TracePrintf(0, "Debug: Reading first block\n");
-        void *first_block = malloc(BLOCKSIZE);
+        first_block = malloc(BLOCKSIZE);
         int c;
         if ((c = ReadSector(1, (void *) first_block)) == ERROR) {
             return ERROR;
@@ -146,124 +148,15 @@ main(int argc, char **argv)
                 // blockk for the directory entries.
                 // check each block in NUM_DIRECT. TODO!! Test rest of blocks
 
+                // Split the pathname by /
+                char first_char = pathname[0];
+                char *token = strtok(pathname, "/");
+
                 // Check if absolute or relative
-                if (pathname[0] == '/') { // absolute
+                if (first_char == '/') { // absolute
                     // Use root inode
-                    struct inode *root_inode = (struct inode *) (first_block + sizeof(struct fs_header));
-                    
-                    // read blocks for that inode.
-                    int posInBlock = 0;
-                    w
-                    for (i = 0; i < NUM_DIRECT_BLOCKS; i++){
-                        if(root_inode->direct[i] == 0)
-                        {
-                            // not valid block.
-                            break;
-                        }
-                        else {
-                            void *current_block = malloc(BLOCKSIZE);
-                            if ((c = ReadSector((int) root_inode->direct[i], current_block)) == ERROR) {
-                                return ERROR;
-                            }
-
-                            // Check if any dir_entries are 0
-                            int num_dir_entries = root_inode->size / sizeof(struct dir_entry);
-                            if (num_dir_entries > BLOCKSIZE / sizeof(struct dir_entry)){
-                                // we need to check multiple blocks
-                            }
-                            int j;
-                            //check if there are any Entries matching the current one in current directory.
-                            for (j = 0; j < num_dir_entries; j++) {
-                                struct dir_entry *curr_dir_entry = (struct dir_entry *) (current_block + j * sizeof(struct dir_entry));
-
-                                //Verify that the Current Directory Entry is a file
-                                // OR verify if it's a directory. 
-                            
-                                //recursive bit
-                                
-                                if(!("/" , pathname, )) //or strtok pathname == 1;
-                                {
-                                     if(names are the same) {
-                                            return 1;// return the inode num;
-                                        }
-
-                                        else{
-                                             TracePrintf(0, "File not found, but there is directory. Returning... CURRENT DIRECTORY NO MATCHES");
-                                            continue;
-                                        }
-
-                                }
-
-                                else{
-                                    if(names match up){ //compare one character by one character. Check if pathname is null terminated. DIRNAME is not!
-                                        //name of directory is found, check next segment of directory.
-                                        return (strtok(1));
-                                    }
-                                    else{
-                                        TracePrintf(0, "Directory not found, but there are more direc_entries. Returning... CURRENT DIRECTORY NO MATCHES");
-                                        continue;
-                                    }
-                                }
-
-                                /**
-                                if(curr_dir_entry->inode->type == INODE_DIRECTORY)
-                                {
-                                    //check if pathname equals directory path name 
-                                    if(compareName(name, pathname, DIRNAMELEN))
-                                    {
-                                        //SUCESS! Found next diretory!
-                                        //?? call agin?
-                                    }
-                                    else{
-                                        //
-
-                                        if(compareNamed()){
-
-                                        }    
-                                        else{
-
-                                        }
-                                    }
-
-                                }
-                                else if(curr_dir_entry->inode->type == INODE_FREE) 
-                                {
-                                    //compareName
-
-                                    //      
-                                    //                  max String LENGTH
-                                    if(compareName(name, pathname, DIRNAMELEN)){
-                                        return 1;
-                                    }
-                                    else{
-                                        //if this is the last file
-                                        // return 0;
-
-                                        //else 
-                                        //
-                                    }
-                                }
-                                **/
-                                
-
-
-                            }
-                        }
-                    }
-                    
-                } else { // relative
-
+                    int inum_result = check_folder(ROOTINODE, token);
                 }
-
-                
-                TracePrintf(0, "In OPEN: testing root_inode. Is there any diret blocks %d", root_inode.DIRECT_BLOCKS);
-                
-                root_inode.
-
-
-                //
-
-                //Open correct folder();
             
             case CLOSE_M:
             case CREATE_M:
@@ -351,5 +244,162 @@ int find_free_inode(int *free_inodes_arr) {
         }
     }
     // no free inodes left, return error
+    return ERROR;
+}
+
+// return inode number to open
+int check_folder(int curr_inum, char *curr_pathname) {
+    int c;
+    struct inode *curr_inode = (struct inode *) (first_block + curr_inum * sizeof(struct inode));
+    // Check if this is the last one
+    char *temp_pathname = malloc(strlen(curr_pathname) + 1);
+    strcpy(temp_pathname, curr_pathname);
+    curr_pathname = strtok(NULL, "/");
+    int reached_file = 0;
+    // Check that is directory type
+    if (curr_inode->type != INODE_DIRECTORY) {
+        // Not a directory
+        return ERROR;
+    }
+
+    // Check if reached base case
+    if (curr_pathname == NULL) {
+        // Reached the end, temp_pathname should be a file - now need to look for it in this folder
+        reached_file = 1;
+    }
+
+    int num_dir_entries = curr_inode->size / sizeof(struct dir_entry);
+    int curr_dir_index = 0;
+    int i;
+    for (i = 0; i < NUM_DIRECT; i++) {
+        if (curr_inode->direct[i] == 0) {
+            // Not a valid block -> we didn't find it. Return ERROR
+            free(temp_pathname);
+            return ERROR;
+        } else {
+            
+            // Check this current direct block for our folder
+            void *current_block = malloc(BLOCKSIZE);
+            if ((c = ReadSector((int) curr_inode->direct[i], current_block)) == ERROR) {
+                free(current_block);
+                free(temp_pathname);
+                return ERROR;
+            }
+
+            int j;
+            for (j = 0; j < num_dir_entries; j++) {
+                // If went past the num_dir_entries in total, didn't find it
+                if (curr_dir_index >= num_dir_entries) {
+                    free(current_block);
+                    free(temp_pathname);
+                    return ERROR;
+                }
+                curr_dir_index++;
+                struct dir_entry *curr_dir_entry = (struct dir_entry *) (current_block
+                + j * sizeof(struct dir_entry));
+                // Compare entry with the current folder we're in
+                // Use strncmp because curr_dir_entry isn't null terminated
+                if (strncmp(curr_dir_entry->name, temp_pathname, strlen(temp_pathname)) == 0) {
+                    // Match, recursively call if not file
+                    if (reached_file == 0) {
+                        TracePrintf(0, "Found folder, recursively calling\n");
+                        free(current_block);
+                        free(temp_pathname);
+                        return check_folder(curr_dir_entry->inum, curr_pathname);
+                    } else {
+                        TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
+                        // Make sure is file
+                        struct inode *file_inode = (struct inode *) (first_block + 
+                        sizeof(struct fs_header) + curr_dir_entry->inum * sizeof(struct inode));
+                        if (file_inode->type == INODE_REGULAR) {
+                            free(current_block);
+                            free(temp_pathname);
+                            return curr_dir_entry->inum;
+                        } else {
+                            free(current_block);
+                            free(temp_pathname);
+                            return ERROR;
+                        }
+                        
+                    }
+                }
+            }
+
+            free(current_block);
+        }
+    }
+
+    // Didn't find it, now iterate through indirect block
+    void *indirect_block = malloc(BLOCKSIZE);
+    if ((c = ReadSector((int) curr_inode->indirect, indirect_block)) == ERROR) {
+        free(indirect_block);
+        free(temp_pathname);
+        return ERROR;
+    }
+
+    // Holder for each block we go through inside the indirect block
+    void *indirect_block_block = malloc(BLOCKSIZE);
+    for (i = 0; i < BLOCKSIZE / (int) sizeof(int); i++) {
+        int *indirect_inum = (int *) (indirect_block + i * sizeof(int));
+        if (*indirect_inum == 0) {
+            free(indirect_block);
+            free(temp_pathname);
+            free(indirect_block_block);
+            return ERROR;
+        }
+        if ((c = ReadSector(*indirect_inum, indirect_block_block)) == ERROR) {
+            free(indirect_block);
+            free(temp_pathname);
+            free(indirect_block_block);
+            return ERROR;
+        }
+        int j;
+        for (j = 0; j < num_dir_entries; j++) {
+            // If went past the num_dir_entries in total, didn't find it
+            if (curr_dir_index >= num_dir_entries) {
+                free(indirect_block);
+                free(temp_pathname);
+                free(indirect_block_block);
+                return ERROR;
+            }
+            curr_dir_index++;
+            struct dir_entry *curr_dir_entry = (struct dir_entry *) (indirect_block_block
+            + j * sizeof(struct dir_entry));
+            // Compare entry with the current folder we're in
+            // Use strncmp because curr_dir_entry isn't null terminated
+            if (strncmp(curr_dir_entry->name, temp_pathname, strlen(temp_pathname)) == 0) {
+                // Match, recursively call if not file
+                if (reached_file == 0) {
+                    free(indirect_block);
+                    free(temp_pathname);
+                    free(indirect_block_block);
+                    TracePrintf(0, "Found folder, recursively calling\n");
+                    return check_folder(curr_dir_entry->inum, curr_pathname);
+                } else {
+                    TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
+                    // Make sure is file
+                    struct inode *file_inode = (struct inode *) (first_block + 
+                    sizeof(struct fs_header) + curr_dir_entry->inum * sizeof(struct inode));
+                    if (file_inode->type == INODE_REGULAR) {
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return curr_dir_entry->inum;
+                    } else {
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return ERROR;
+                    }
+                    
+                }
+            }
+        }
+    }
+
+    free(indirect_block_block);
+    free(indirect_block);
+    free(temp_pathname);
+
     return ERROR;
 }
