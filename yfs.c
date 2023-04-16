@@ -71,11 +71,13 @@ main(int argc, char **argv)
         // Get ready to get all the blocks needed for all the inodes - can infer from the first block of root
         int num_blocks_for_inodes = root_inode->direct[0] - 1;
         // In case we need it: start of the data blocks
-        int start_data_blocks = root_inode->direct[0];
+        // int start_data_blocks = root_inode->direct[0];
         // Init free blocks - since concerned about only data blocks, just subtract those
         // 0 = free 1 = not free -1 = never can be free
         // free_blocks = (int *) malloc(sizeof(int) * (num_blocks - num_blocks_for_inodes));
         int arr_free_blocks[num_blocks - num_blocks_for_inodes];
+        arr_free_blocks[0] = -1;
+        arr_free_blocks[1] = -1;
         // Curr byte pointer to see if went past block size - init to inode because 0th node not free (fs_header)
         int byte_pointer = sizeof(struct fs_header);
         int block_i = 2;
@@ -84,6 +86,9 @@ main(int argc, char **argv)
         void *curr_block = malloc(BLOCKSIZE);
         memcpy(curr_block, first_block, BLOCKSIZE);
         for (i = 1; i < num_inodes+1; i++) {
+            // Mark as not free because used for inodes
+            arr_free_blocks[block_i] = -1;
+            TracePrintf(0, "Block we're looking at: %d\n", block_i);
             // If byte pointer past block size, get the next block
             if (byte_pointer > BLOCKSIZE) {
                 if ((c = ReadSector(block_i, curr_block)) == ERROR) {
@@ -135,9 +140,11 @@ main(int argc, char **argv)
 
         // We are done building the free lists
         free(curr_block);
-        // use pointers
-        free_inodes = &arr_free_inodes[0];
-        free_blocks = &arr_free_blocks[0];
+        // copy to pointers I hate this stupid thing
+        free_inodes = malloc(sizeof(arr_free_inodes));
+        memcpy(free_inodes, &arr_free_inodes, sizeof(arr_free_inodes));
+        free_blocks = malloc(sizeof(arr_free_blocks));
+        memcpy(free_blocks, &arr_free_blocks, sizeof(arr_free_blocks));
 
         // Set current directory as root
         current_inode_directory = ROOTINODE;
@@ -178,6 +185,7 @@ main(int argc, char **argv)
             case CLOSE_M:
             case CREATE_M:
                 // Try creating now
+                TracePrintf(0, "In CREATE inside YFS\n");
                 // Copy the pathname
                 CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
                 // Now have pathname, try to copy into the right folder
@@ -244,8 +252,6 @@ main(int argc, char **argv)
                 break;
         }
 
-        (void) free_blocks;
-        (void) start_data_blocks;
 
         // Free the current message
         free(message);
@@ -390,7 +396,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                         // Change current dir entry to this one
                         memcpy(curr_dir_entry, &dir_entry_to_insert, sizeof(struct dir_entry));
                         // Write to disk
-                        if ((c = WriteSector(curr_inum, current_block)) == ERROR) {
+                        if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
                             return ERROR;
                         }
 
@@ -404,6 +410,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
             if (mode == 2 || mode == 4) {
                 // Only if we're still in the block we can append a dir_entry
                 if (j * sizeof(struct dir_entry) < BLOCKSIZE) {
+                    TracePrintf(0, "location: %d\n", j);
                     struct dir_entry dir_entry_to_insert;
                     if (mode == 2) { // create a file
                         dir_entry_to_insert = create_file_dir(temp_pathname, 1, parent_inum, 0);
@@ -413,10 +420,13 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     // Change current dir entry to this one
                     memcpy(current_block + j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
                     // Write to disk
-                    if ((c = WriteSector(curr_inum, current_block)) == ERROR) {
+                    TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
+                    if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
                         return ERROR;
                     }
-                } 
+
+                    return dir_entry_to_insert.inum;
+                }
             }
             
             free(current_block);
@@ -519,6 +529,8 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         insert_inode->type = INODE_REGULAR;
     } else {
         insert_inode->type = INODE_DIRECTORY;
+
+        // TODO: Insert . and ..
     }
     // Find next free block
     insert_inode->direct[0] = find_free_block();
@@ -528,6 +540,8 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         entry_to_ins.inum = -1;
         return entry_to_ins;
     }
+
+    TracePrintf(0, "creating/opening file\n");
 
     return entry_to_ins;
 }
