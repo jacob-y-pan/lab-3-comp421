@@ -8,7 +8,7 @@
 
 int num_inodes;
 int num_blocks;
-
+int num_data_blocks;
 // Global arrays because f stupid functions
 int *free_inodes;
 int *free_blocks;
@@ -75,7 +75,8 @@ main(int argc, char **argv)
         // Init free blocks - since concerned about only data blocks, just subtract those
         // 0 = free 1 = not free -1 = never can be free
         // free_blocks = (int *) malloc(sizeof(int) * (num_blocks - num_blocks_for_inodes));
-        int arr_free_blocks[num_blocks - num_blocks_for_inodes];
+        num_data_blocks = num_blocks - num_blocks_for_inodes;
+        int arr_free_blocks[num_data_blocks];
         arr_free_blocks[0] = -1;
         arr_free_blocks[1] = -1;
         // Curr byte pointer to see if went past block size - init to inode because 0th node not free (fs_header)
@@ -85,6 +86,11 @@ main(int argc, char **argv)
         // TODO: Check indirect free blocks work
         void *curr_block = malloc(BLOCKSIZE);
         memcpy(curr_block, first_block, BLOCKSIZE);
+
+        // First initialize all data blocks as 0
+        for (i = num_blocks_for_inodes+1; i < num_data_blocks; i++) {
+            arr_free_blocks[i] = 0;
+        }
         for (i = 1; i < num_inodes+1; i++) {
             // Mark as not free because used for inodes
             arr_free_blocks[block_i] = -1;
@@ -270,9 +276,10 @@ main(int argc, char **argv)
 // Function to find the next free inode
 int find_free_inode() {
     int i;
-    TracePrintf(0, "Looking for a free inode\n");
+    TracePrintf(0, "Looking for a free inode size %d\n", (int) sizeof(free_inodes));
     // Start at 2 because root node is 1, 0 is fs_header
-    for (i = 2; i < (int) sizeof(free_inodes); i++) {
+    for (i = 2; i < num_inodes+1; i++) {
+        TracePrintf(0, "we are at index %d for free inodes\n", i);
         if (free_inodes[i] == 0) {
             free_inodes[i] = 1;
             TracePrintf(0, "Inode that we are gonna use: %d\n", i);
@@ -287,8 +294,8 @@ int find_free_inode() {
 int find_free_block() {
     int i;
     TracePrintf(0, "Looking for a free block\n");
-    // Start at 2 because root node is 1, 0 is fs_header
-    for (i = 2; i < (int) sizeof(free_blocks); i++) {
+    // Start at 2 because OS block 0, 1 is for inodes and fs_header
+    for (i = 2; i < num_data_blocks; i++) {
         if (free_blocks[i] == 0) {
             free_blocks[i] = 1;
             TracePrintf(0, "Block that we are gonna use: %d\n", i);
@@ -322,6 +329,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
     }
 
     int num_dir_entries = curr_inode->size / sizeof(struct dir_entry);
+    TracePrintf(0, "Num dir entries: %d\n", num_dir_entries);
     int curr_dir_index = 0;
 
     // Go through direct entries first
@@ -389,9 +397,9 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     if (curr_dir_entry->inum == 0) {
                         struct dir_entry dir_entry_to_insert;
                         if (mode == 2) { // create a file
-                            dir_entry_to_insert = create_file_dir(temp_pathname, 1, parent_inum, 1);
+                            dir_entry_to_insert = create_file_dir(temp_pathname, 1, parent_inum, 0);
                         } else { // create a dir
-                            dir_entry_to_insert = create_file_dir(temp_pathname, 0, parent_inum, 1);
+                            dir_entry_to_insert = create_file_dir(temp_pathname, 0, parent_inum, 0);
                         }
                         // Change current dir entry to this one
                         memcpy(curr_dir_entry, &dir_entry_to_insert, sizeof(struct dir_entry));
@@ -413,9 +421,9 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     TracePrintf(0, "location: %d\n", j);
                     struct dir_entry dir_entry_to_insert;
                     if (mode == 2) { // create a file
-                        dir_entry_to_insert = create_file_dir(temp_pathname, 1, parent_inum, 0);
+                        dir_entry_to_insert = create_file_dir(temp_pathname, 1, parent_inum, 1);
                     } else { // create a dir
-                        dir_entry_to_insert = create_file_dir(temp_pathname, 0, parent_inum, 0);
+                        dir_entry_to_insert = create_file_dir(temp_pathname, 0, parent_inum, 1);
                     }
                     // Change current dir entry to this one
                     memcpy(current_block + j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
@@ -519,6 +527,7 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
     }
     // Add size to parent
     if (append == 1) {
+        TracePrintf(0, "appending to parent\n");
         struct inode *parent_inode = (struct inode *) (first_block + parent_inum * sizeof(struct inode));
         parent_inode->size += sizeof(struct dir_entry);
         // Will overwrite first block in end
@@ -534,6 +543,7 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
     }
     // Find next free block
     insert_inode->direct[0] = find_free_block();
+    TracePrintf(0, "New block: %d\n", insert_inode->direct[0]);
 
     // Edit inode, overwrite first block
     if ((c = WriteSector(1, first_block)) == ERROR) {
