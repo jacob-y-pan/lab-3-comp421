@@ -33,9 +33,10 @@ int Close(int fd) {
 }
 
 int Create(char *pathname) {
+    TracePrintf(0, "In create\n");
     struct my_msg test_message = {.type = CREATE_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
-    TracePrintf(0, "In create\n");
+    
     return 0;
 }
 
@@ -87,7 +88,10 @@ int ReadLink(char *pathname, char *buf, int len) {
 }
 
 int MkDir(char *pathname) {
-    (void) pathname;
+    TracePrintf(0, "In mkdir\n");
+    struct my_msg test_message = {.type = MKDIR_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
+    
     return 0;
 }
 
@@ -112,5 +116,7 @@ int Sync(void) {
 }
 
 int Shutdown(void) {
+    struct my_msg test_message = {.type = SHUTDOWN_M};
+    Send((void *) &test_message, -FILE_SERVER);
     return 0;
 }

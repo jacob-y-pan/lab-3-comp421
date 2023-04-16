@@ -13,7 +13,9 @@ main()
         int fd;
 
         // fd = Create("/file00");
-        Open("/file00");
+        // Open("file00");
+
+        MkDir("testfolder3");
 
         (void) fd;
 
