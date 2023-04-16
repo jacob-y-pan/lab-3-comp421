@@ -206,7 +206,7 @@ main(int argc, char **argv)
                     int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
                     TracePrintf(0, "Created file with this inum: %d\n", inum_result);
                 } else { // relative
-                    int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 1);
+                    int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 2);
                     TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                 }
 
@@ -283,6 +283,10 @@ main(int argc, char **argv)
                     int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 4);
                     TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
                 }
+
+                struct my_msg mkdir_message = {.type = MKDIR_M, .data1 = 1};
+                TracePrintf(0, "replyin now\n");
+                Reply((void *) &mkdir_message, client_pid);
                 break;
             case RMDIR_M:
             case CHDIR_M:
@@ -370,7 +374,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
         reached_file = 1;
     }
 
-    int num_dir_entries = curr_inode->size / sizeof(struct dir_entry);
+    int num_dir_entries = curr_inode->size / (int) sizeof(struct dir_entry);
     TracePrintf(0, "Num dir entries: %d\n", num_dir_entries);
     int curr_dir_index = 0;
 
@@ -461,14 +465,17 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                 // Only if we're still in the block we can append a dir_entry
                 if (j * sizeof(struct dir_entry) < BLOCKSIZE) {
                     TracePrintf(0, "location: %d\n", j);
+                    int old_j = j;
                     struct dir_entry dir_entry_to_insert;
                     if (mode == 2) { // create a file
                         dir_entry_to_insert = create_file_dir(temp_pathname, 1, parent_inum, 1);
                     } else { // create a dir
                         dir_entry_to_insert = create_file_dir(temp_pathname, 0, parent_inum, 1);
                     }
+                    TracePrintf(0, "Dir entry: %d %s\n", dir_entry_to_insert.inum, dir_entry_to_insert.name);
                     // Change current dir entry to this one
-                    memcpy(current_block + j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
+                    TracePrintf(0, "%p\n", current_block + old_j * sizeof(struct dir_entry));
+                    memcpy(current_block + old_j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
                     // Write to disk
                     TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
                     if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
@@ -610,7 +617,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
 // append boolean
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append) {
     struct dir_entry entry_to_ins = {.inum = find_free_inode()};
-    TracePrintf(0, "creating folder %s\n", actual_filename);
+    TracePrintf(0, "creating folder or file %s\n", actual_filename);
     strncpy(entry_to_ins.name, actual_filename, strlen(actual_filename));
     // add null terminators to end
     if (sizeof(actual_filename) < DIRNAMELEN) {
