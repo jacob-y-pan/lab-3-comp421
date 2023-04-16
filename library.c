@@ -5,9 +5,24 @@
 
 #include "yfs_header.h"
 
+
+int[MAX_OPEN_FILES] file_info_collection;
+
+struct info_file{
+    int inode;
+    int pos;
+    int fd;
+    bool openClose;
+}
+/** global array of structs that represents the current file locations */
+
+
 int Open(char *pathname) {
     struct my_msg test_message = {.type = OPEN_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
+
+    
+
     return 0;
 }
 
