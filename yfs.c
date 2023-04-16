@@ -610,10 +610,11 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
 // append boolean
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append) {
     struct dir_entry entry_to_ins = {.inum = find_free_inode()};
+    TracePrintf(0, "creating folder %s\n", actual_filename);
     strncpy(entry_to_ins.name, actual_filename, strlen(actual_filename));
     // add null terminators to end
     if (sizeof(actual_filename) < DIRNAMELEN) {
-        memset(entry_to_ins.name + sizeof(actual_filename), '\0', DIRNAMELEN - sizeof(actual_filename));
+        memset(&entry_to_ins.name + strlen(actual_filename) + 1, '\0', DIRNAMELEN - strlen(actual_filename));
     }
     // Add size to parent
     if (append == 1) {
