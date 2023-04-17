@@ -275,9 +275,12 @@ main(int argc, char **argv)
                     TracePrintf(0, "In MKDIR inside YFS\n");
                     // Copy the pathname
                     CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    TracePrintf(0, "Path creating: %s\n", pathname);
                     // Now have pathname, try to copy into the right folder
                     first_char = pathname[0];
                     token = strtok(pathname, "/");
+
+                    
 
                     // Absolute path
                     if (first_char == '/') {

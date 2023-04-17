@@ -16,6 +16,9 @@ main()
         // Open("file00");
 
         MkDir("testfolder3");
+        RmDir("testfolder3");
+        MkDir("newfolder3");
+        MkDir("newfolder3/newnewfolder");
 
         (void) fd;
 
