@@ -261,7 +261,30 @@ main(int argc, char **argv)
                     
                     break;
                 case READ_M:
+                    //Reads a specific file at the desired 
+                    TracePrintf(0, "Inside the Read function");
+
+                    // Reads a specific inode at the right time;
+
+                    // Specific data fields --> data1 (position), data2 (buffer), data3
+                    int inode_check = (int) message->data1;
+                    int number_to_read = (int) message->data2;
+
+                    TracePrintf(0, "Reading file with inode num %d", inode_check);
+                    TracePrintf(0, "Amount to Read %d", number_to_read);
+                    // read bugffer + size, to check
+
+                    // 
+
+
+                    
+                     
+
                 case WRITE_M:
+                    //Writes at a specific file at the desired location.
+                    TracePrintf(0, "Inside the Write function");
+
+
                 case SEEK_M:
                 case LINK_M:
                 case UNLINK_M:
