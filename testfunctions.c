@@ -17,11 +17,15 @@ main()
 
         // MkDir("testfolder3/bingofolder");
         // RmDir("testfolder3/bingofolder");
-        // MkDir("newfolder3");
-        // MkDir("newfolder3/newnewfolder");
+        MkDir("newfolder3");
+        MkDir("newfolder3/newnewfolder");
         ChDir("newfolder3");
-        // MkDir("newnewfolder2");
-        Create("newnewfolder2/test.txt");
+        MkDir("newnewfolder2");
+        Create("test.txt");
+        struct Stat statbuf;
+        Stat("test.txt", &statbuf);
+
+        printf("Stat test: %d\n", statbuf.inum);
 
         (void) fd;
 

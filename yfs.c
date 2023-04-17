@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <comp421/iolib.h>
 
 #include "yfs_header.h"
 
@@ -166,6 +167,7 @@ main(int argc, char **argv)
             char *token;
             // Message to reply back with
             struct my_msg reply_message;
+            int inum_result = -1;
             switch (message_type) {
                 case OPEN_M:
                     TracePrintf(0, "In open inside YFS\n");
@@ -184,10 +186,10 @@ main(int argc, char **argv)
                     // Check if absolute or relative
                     if (first_char == '/') { // absolute
                         // Use root inode
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 1);
+                         inum_result = check_folder(message->data2, token, message->data2, 1);
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     }
 
@@ -204,10 +206,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
+                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
                         TracePrintf(0, "Created file with this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 2);
+                         inum_result = check_folder(message->data2, token, message->data2, 2);
                         TracePrintf(0, "Created file at this inum: %d\n", inum_result);
                     }
 
@@ -279,10 +281,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 4);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 4);
                         TracePrintf(0, "Created directory with this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 4);
+                        inum_result = check_folder(message->data2, token, message->data2, 4);
                         TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
                     }
                     break;
@@ -296,10 +298,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 5);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 5);
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 5);
+                        inum_result = check_folder(message->data2, token, message->data2, 5);
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     }
                     break;
@@ -311,7 +313,7 @@ main(int argc, char **argv)
                     first_char = pathname[0];
                     token = strtok(pathname, "/");
                     // Absolute path
-                    int inum_result;
+                    
                     if (first_char == '/') {
                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 6);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
@@ -319,9 +321,35 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 6);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
                     }
-                    reply_message.data2 = inum_result;
                     break;
                 case STAT_M:
+                    TracePrintf(0, "In STAT inside YFS\n");
+                    // Copy the pathname
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    struct Stat statbufholder;
+                    // Now have pathname, try to remove into the right folder
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
+                    // Can just use open because returning inum
+                    // Absolute path
+                    if (first_char == '/') {
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
+                    } else { // relative
+                        inum_result = check_folder(message->data2, token, message->data2, 1);
+                    }
+                    // Store into stat
+                    struct inode *stat_inode = (struct inode *) (first_block + inum_result * sizeof(struct inode));
+                    statbufholder.inum = inum_result;
+                    statbufholder.type = stat_inode->type;
+                    statbufholder.size = stat_inode->size;
+                    statbufholder.nlink = stat_inode->nlink;
+
+                    // Write to the buffer
+                    TracePrintf(0, "Stat inode: %d\n", statbufholder.inum);
+                    struct Stat *client_buffer = (struct Stat *) message->ptr2;
+                    CopyTo(client_pid, (void *) client_buffer, &statbufholder, sizeof(statbufholder));
+
+                    break;
                 case SYNC_M:
                 case SHUTDOWN_M:
                     // See page - write cached to disk
@@ -335,8 +363,14 @@ main(int argc, char **argv)
                     TracePrintf(0, "CRITICIAL: Invalid message sent!\n");
             }
 
+            // Set up reply message
+            reply_message.type = message_type;
+            reply_message.data2 = inum_result;
+
             // Clean up data
             memset(&pathname, '\0', MAXPATHNAMELEN);
+
+            // Actually reply
             Reply((void *) &reply_message, client_pid);
 
             // Free the current message
