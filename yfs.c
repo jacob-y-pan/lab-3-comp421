@@ -531,6 +531,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     TracePrintf(0, "%p\n", current_block + old_j * sizeof(struct dir_entry));
                     memcpy(current_block + old_j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
                     // Write to disk
+                    TracePrintf(0, "Copied\n");
                     TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
                     if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
                       return ERROR;
@@ -702,11 +703,10 @@ int open_file_inode(struct dir_entry *this_dir_entry) {
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append) {
     struct dir_entry entry_to_ins = {.inum = find_free_inode()};
     TracePrintf(0, "creating folder or file %s\n", actual_filename);
+    // make everything null terminated for now
+    memset(&entry_to_ins.name, '\0', DIRNAMELEN);
     strncpy(entry_to_ins.name, actual_filename, strlen(actual_filename));
-    // add null terminators to end
-    if (strlen(actual_filename) < DIRNAMELEN) {
-        memset(&entry_to_ins.name + strlen(actual_filename) + 1, '\0', DIRNAMELEN - strlen(actual_filename));
-    }
+    
     TracePrintf(0, "Name: %s\n", entry_to_ins.name);
     // Add size to parent
     if (append == 1) {
