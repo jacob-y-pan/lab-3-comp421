@@ -744,8 +744,14 @@ int open_file_inode(struct dir_entry *this_dir_entry) {
 // file_dir: 1 if file, 0 if dir
 // append boolean
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append) {
-    struct dir_entry entry_to_ins = {.inum = find_free_inode()};
     TracePrintf(0, "creating folder or file %s\n", actual_filename);
+    struct dir_entry null_entry = {.inum = -1, .name = ""};
+    // throw error if filename > DIRNAMELEN
+    if (strlen(actual_filename) > DIRNAMELEN) {
+        TracePrintf(3, "ERROR: Filename too long\n");
+        return null_entry;
+    }
+    struct dir_entry entry_to_ins = {.inum = find_free_inode()};
     // make everything null terminated for now
     memset(&entry_to_ins.name, '\0', DIRNAMELEN);
     strncpy(entry_to_ins.name, actual_filename, strlen(actual_filename));
@@ -772,8 +778,7 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         void *temp_block_for_insert = malloc(BLOCKSIZE);
         if ((c = ReadSector(insert_inode->direct[0], temp_block_for_insert)) == ERROR) {
             free(temp_block_for_insert);
-            entry_to_ins.inum = -1;
-            return entry_to_ins;
+            return null_entry;
         }
         // .
         struct dir_entry this_entry = {.inum = entry_to_ins.inum, .name = "."};
@@ -785,16 +790,14 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         insert_inode->size += 2 * sizeof(struct dir_entry);
         if ((c = WriteSector(insert_inode->direct[0], temp_block_for_insert)) == ERROR) {
             free(temp_block_for_insert);
-            entry_to_ins.inum = -1;
-            return entry_to_ins;
+            return null_entry;
         }
         free(temp_block_for_insert);
     }
 
     // Edit inode, overwrite first block
     if ((c = WriteSector(1, first_block)) == ERROR) {
-        entry_to_ins.inum = -1;
-        return entry_to_ins;
+        return null_entry;
     }
 
     TracePrintf(0, "creating/opening file\n");
