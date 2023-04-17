@@ -181,6 +181,10 @@ main(int argc, char **argv)
 
                     // Split the pathname by /
                     first_char = pathname[0];
+                    // Add . if last char is /
+                    if (pathname[strlen(pathname) - 1] == '/') {
+                        pathname[strlen(pathname)] = '.';
+                    }
                     token = strtok(pathname, "/");
 
                     // Check if absolute or relative
