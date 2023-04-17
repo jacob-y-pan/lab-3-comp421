@@ -396,6 +396,15 @@ int find_free_inode() {
     for (i = 2; i < num_inodes+1; i++) {
         TracePrintf(0, "we are at index %d for free inodes\n", i);
         if (free_inodes[i] == 0) {
+            // Increment reuse
+            if ((c = ReadSector(1, first_block)) == ERROR) {
+                return ERROR;
+            }
+            struct inode *this_inode = (first_block + i * sizeof(struct inode));
+            this_inode->reuse += 1;
+            if ((c = WriteSector(1, first_block)) == ERROR) {
+                return ERROR;
+            }
             free_inodes[i] = 1;
             TracePrintf(0, "Inode that we are gonna use: %d\n", i);
             return i;
