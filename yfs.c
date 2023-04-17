@@ -157,9 +157,10 @@ main(int argc, char **argv)
         current_inode_directory = ROOTINODE;
 
         // Receive from the client a message
-        while (true) {
+        while (1) {
             struct my_msg *message = malloc(sizeof(struct my_msg));
-            int client_pid = Receive((void *) message);
+            int client_pid;
+            while ((client_pid = Receive((void *) message)) == 0);
             TracePrintf(0, "Client pid: %d\n", client_pid);
 
             int message_type = message->type;
@@ -208,7 +209,7 @@ main(int argc, char **argv)
                         int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
                         TracePrintf(0, "Created file with this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 1);
+                        int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 2);
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     }
 
@@ -315,13 +316,12 @@ main(int argc, char **argv)
                     Exit(1);
                     break;
                 default:
-                    TracePrintf(0, "CRITICIAL: Invalid message sent!");
+                    TracePrintf(0, "CRITICIAL: Invalid message sent!\n");
             }
 
             // Just reply with some message
             struct my_msg some_message;
             Reply((void *) &some_message, client_pid);
-
 
             // Free the current message
             free(message);
@@ -442,7 +442,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                         // Make sure is file
                         struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
                         TracePrintf(0, "Block number: %d\n", file_inode->direct[0]);
-                        if (mode == 1) {
+                        if (mode == 1) { // we are opening the file
                             if (file_inode->type == INODE_REGULAR) {
                                 free(current_block);
                                 free(temp_pathname);
@@ -469,6 +469,11 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
 
                                 return 0;
                             }
+                        } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
+                            TracePrintf(0, "ERROR: file already created!\n");
+                            free(current_block);
+                            free(temp_pathname);
+                            return ERROR;
                         }
                         
                         
@@ -577,10 +582,10 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     TracePrintf(0, "Found folder, recursively calling\n");
                     return check_folder(curr_dir_entry->inum, curr_pathname, curr_inum, mode);
                 } else {
+                    TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
+                    // Make sure is file
+                    struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
                     if (mode == 1) {
-                        TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
-                        // Make sure is file
-                        struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
                         if (file_inode->type == INODE_REGULAR) {
                             free(indirect_block);
                             free(temp_pathname);
@@ -592,6 +597,35 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                             free(indirect_block_block);
                             return ERROR;
                         }
+                    } else if (mode == 5) { // delete directory
+                        if (file_inode->type == INODE_DIRECTORY) {
+                            // don't remove . and .. and root
+                            if (curr_dir_entry->inum == ROOTINODE || strcmp(curr_dir_entry->name, ".") == 0 || strcmp(curr_dir_entry->name, "..") == 0 ){
+                                TracePrintf(0, "Trying to remove root or . or ..\n");
+                                free(indirect_block);
+                                free(temp_pathname);
+                                free(indirect_block_block);
+                                return ERROR;
+                            }
+                            remove_inode(curr_dir_entry->inum);
+                            curr_dir_entry->inum = 0;
+                            memset(curr_dir_entry->name, '\0', DIRNAMELEN);
+                            // Write this to block
+                            if ((c = WriteSector(*indirect_inum, indirect_block_block)) == ERROR) {
+                                free(indirect_block);
+                                free(temp_pathname);
+                                free(indirect_block_block);
+                                return ERROR;
+                            }
+
+                            return 0;
+                        }
+                    } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
+                        TracePrintf(0, "ERROR: file already created!\n");
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return ERROR;
                     }
                     
                 } 
@@ -622,7 +656,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
         }
 
         // If is create, append
-        if (mode == 2 || mode == 4) {
+        if (reached_file && (mode == 2 || mode == 4)) {
             // Only if we're still in the block we can append a dir_entry
             if (j * sizeof(struct dir_entry) < BLOCKSIZE) {
                 TracePrintf(0, "location: %d\n", j);
