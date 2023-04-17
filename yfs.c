@@ -27,6 +27,7 @@ int find_free_inode();
 int find_free_block();
 int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode);
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append);
+int remove_inode(int inum);
 
 // Helper Functions
 
@@ -156,153 +157,175 @@ main(int argc, char **argv)
         current_inode_directory = ROOTINODE;
 
         // Receive from the client a message
-        struct my_msg *message = malloc(sizeof(struct my_msg));
-        int client_pid = Receive((void *) message);
-        TracePrintf(0, "Client pid: %d\n", client_pid);
+        while (true) {
+            struct my_msg *message = malloc(sizeof(struct my_msg));
+            int client_pid = Receive((void *) message);
+            TracePrintf(0, "Client pid: %d\n", client_pid);
 
-        int message_type = message->type;
+            int message_type = message->type;
 
-        char pathname[MAXPATHNAMELEN];
-        char first_char;
-        char *token;
-        switch (message_type) {
-            case OPEN_M:
-                TracePrintf(0, "In open inside YFS\n");
-                CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
-                
-                // go down  root node
-                // check the path name one by one.
-                // then... open each file, create each file, open their blocks, check each
-                // blockk for the directory entries.
-                // check each block in NUM_DIRECT. TODO!! Test rest of blocks
+            char pathname[MAXPATHNAMELEN];
+            char first_char;
+            char *token;
+            switch (message_type) {
+                case OPEN_M:
+                    TracePrintf(0, "In open inside YFS\n");
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    
+                    // go down  root node
+                    // check the path name one by one.
+                    // then... open each file, create each file, open their blocks, check each
+                    // blockk for the directory entries.
+                    // check each block in NUM_DIRECT. TODO!! Test rest of blocks
 
-                // Split the pathname by /
-                first_char = pathname[0];
-                token = strtok(pathname, "/");
+                    // Split the pathname by /
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
 
-                // Check if absolute or relative
-                if (first_char == '/') { // absolute
-                    // Use root inode
-                    int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
-                    TracePrintf(0, "opened file at this inum: %d\n", inum_result);
-                } else { // relative
-                    int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 1);
-                    TracePrintf(0, "opened file at this inum: %d\n", inum_result);
-                }
+                    // Check if absolute or relative
+                    if (first_char == '/') { // absolute
+                        // Use root inode
+                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
+                        TracePrintf(0, "opened file at this inum: %d\n", inum_result);
+                    } else { // relative
+                        int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 1);
+                        TracePrintf(0, "opened file at this inum: %d\n", inum_result);
+                    }
 
-                break;
-            case CLOSE_M:
-            case CREATE_M:
-                // Try creating now
-                TracePrintf(0, "In CREATE inside YFS\n");
-                // Copy the pathname
-                CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
-                // Now have pathname, try to copy into the right folder
-                first_char = pathname[0];
-                token = strtok(pathname, "/");
+                    break;
+                case CLOSE_M:
+                case CREATE_M:
+                    // Try creating now
+                    TracePrintf(0, "In CREATE inside YFS\n");
+                    // Copy the pathname
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    // Now have pathname, try to copy into the right folder
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
 
-                // Absolute path
-                if (first_char == '/') {
-                    int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
-                    TracePrintf(0, "Created file with this inum: %d\n", inum_result);
-                } else { // relative
-                    int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 1);
-                    TracePrintf(0, "opened file at this inum: %d\n", inum_result);
-                }
+                    // Absolute path
+                    if (first_char == '/') {
+                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
+                        TracePrintf(0, "Created file with this inum: %d\n", inum_result);
+                    } else { // relative
+                        int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 1);
+                        TracePrintf(0, "opened file at this inum: %d\n", inum_result);
+                    }
 
-                // // Begin at root node
-                // if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
-                //     // Assume is just file and doesn't already exist
-                //     struct dir_entry entry_to_ins = {.inum = find_free_inode((int *) free_inodes)};
-                //     // copy pathname to the entry
-                //     char *token = strtok(pathname, "/");
-                //     strncpy(entry_to_ins.name, token, strlen(token));
-                //     // add null terminators to end
-                //     if (sizeof(pathname) < DIRNAMELEN) {
-                //         memset(entry_to_ins.name + sizeof(pathname), '\0', DIRNAMELEN - sizeof(pathname));
-                //     }
-                //     // Edit root inode page and root inode
-                //     TracePrintf(0, "Block id: %d\n", (int) root_inode->direct[0]);
-                //     void *block_to_edit = malloc(BLOCKSIZE);
-                //     // TODO: See if all the direct blocks are full, check indirect
-                //     if ((c = ReadSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
-                //         return ERROR;
-                //     }
-                //     // Check if any dir_entries are 0
-                //     int num_dir_entries = root_inode->size / sizeof(struct dir_entry);
-                //     int j;
-                //     for (j = 0; j < num_dir_entries; j++) {
-                //         struct dir_entry *curr_dir_entry = (struct dir_entry *) (block_to_edit + j * sizeof(struct dir_entry));
-                //         if (curr_dir_entry->inum == 0) { // This means this dir is free
-                //             TracePrintf(0, "Found an empty dir entry, inserting\n");
-                //             curr_dir_entry->inum = entry_to_ins.inum;
-                //             memcpy(curr_dir_entry->name, entry_to_ins.name, DIRNAMELEN);
-                //             break;
-                //         }
-                //     }
-                //     // If didn't find anything, append
-                //     if (j == num_dir_entries) {
-                //         memcpy(block_to_edit + num_dir_entries * sizeof(struct dir_entry), &entry_to_ins, sizeof(entry_to_ins));
-                //         root_inode->size += sizeof(struct dir_entry);
-                //     }
-                //     // Write to the sector
-                //     if ((c = WriteSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
-                //         return ERROR;
-                //     }
-                //     // Write to the root inode
-                //     // Write to the sector
-                //     if ((c = WriteSector(ROOTINODE, first_block)) == ERROR) {
-                //         return ERROR;
-                //     }
+                    // // Begin at root node
+                    // if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
+                    //     // Assume is just file and doesn't already exist
+                    //     struct dir_entry entry_to_ins = {.inum = find_free_inode((int *) free_inodes)};
+                    //     // copy pathname to the entry
+                    //     char *token = strtok(pathname, "/");
+                    //     strncpy(entry_to_ins.name, token, strlen(token));
+                    //     // add null terminators to end
+                    //     if (sizeof(pathname) < DIRNAMELEN) {
+                    //         memset(entry_to_ins.name + sizeof(pathname), '\0', DIRNAMELEN - sizeof(pathname));
+                    //     }
+                    //     // Edit root inode page and root inode
+                    //     TracePrintf(0, "Block id: %d\n", (int) root_inode->direct[0]);
+                    //     void *block_to_edit = malloc(BLOCKSIZE);
+                    //     // TODO: See if all the direct blocks are full, check indirect
+                    //     if ((c = ReadSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
+                    //         return ERROR;
+                    //     }
+                    //     // Check if any dir_entries are 0
+                    //     int num_dir_entries = root_inode->size / sizeof(struct dir_entry);
+                    //     int j;
+                    //     for (j = 0; j < num_dir_entries; j++) {
+                    //         struct dir_entry *curr_dir_entry = (struct dir_entry *) (block_to_edit + j * sizeof(struct dir_entry));
+                    //         if (curr_dir_entry->inum == 0) { // This means this dir is free
+                    //             TracePrintf(0, "Found an empty dir entry, inserting\n");
+                    //             curr_dir_entry->inum = entry_to_ins.inum;
+                    //             memcpy(curr_dir_entry->name, entry_to_ins.name, DIRNAMELEN);
+                    //             break;
+                    //         }
+                    //     }
+                    //     // If didn't find anything, append
+                    //     if (j == num_dir_entries) {
+                    //         memcpy(block_to_edit + num_dir_entries * sizeof(struct dir_entry), &entry_to_ins, sizeof(entry_to_ins));
+                    //         root_inode->size += sizeof(struct dir_entry);
+                    //     }
+                    //     // Write to the sector
+                    //     if ((c = WriteSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
+                    //         return ERROR;
+                    //     }
+                    //     // Write to the root inode
+                    //     // Write to the sector
+                    //     if ((c = WriteSector(ROOTINODE, first_block)) == ERROR) {
+                    //         return ERROR;
+                    //     }
 
-                // }
+                    // }
 
-                
-                break;
-            case READ_M:
-            case WRITE_M:
-            case SEEK_M:
-            case LINK_M:
-            case UNLINK_M:
-            case READLINK_M:
-            case MKDIR_M:
-                // TODO: Add '.' if have / at the end
-                // Try creating now
-                TracePrintf(0, "In MKDIR inside YFS\n");
-                // Copy the pathname
-                CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
-                // Now have pathname, try to copy into the right folder
-                first_char = pathname[0];
-                token = strtok(pathname, "/");
+                    
+                    break;
+                case READ_M:
+                case WRITE_M:
+                case SEEK_M:
+                case LINK_M:
+                case UNLINK_M:
+                case READLINK_M:
+                case MKDIR_M:
+                    // TODO: Add '.' if have / at the end
+                    // Try creating now
+                    TracePrintf(0, "In MKDIR inside YFS\n");
+                    // Copy the pathname
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    // Now have pathname, try to copy into the right folder
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
 
-                // Absolute path
-                if (first_char == '/') {
-                    int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 4);
-                    TracePrintf(0, "Created directory with this inum: %d\n", inum_result);
-                } else { // relative
-                    int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 4);
-                    TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
-                }
-                break;
-            case RMDIR_M:
-            case CHDIR_M:
-            case STAT_M:
-            case SYNC_M:
-            case SHUTDOWN_M:
-                // See page - write cached to disk
-                // TODO: Informative message
-                TracePrintf(0, "EXITING\n");
-                struct my_msg exit_message = {.type = SHUTDOWN_M, .data1 = -1};
-                Reply((void *) &exit_message, client_pid);
-                Exit(1);
-                break;
-            default:
-                TracePrintf(0, "CRITICIAL: Invalid message sent!");
+                    // Absolute path
+                    if (first_char == '/') {
+                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 4);
+                        TracePrintf(0, "Created directory with this inum: %d\n", inum_result);
+                    } else { // relative
+                        int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 4);
+                        TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
+                    }
+                    break;
+                case RMDIR_M:
+                    TracePrintf(0, "In RMDIR inside YFS\n");
+                    // Copy the pathname
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    // Now have pathname, try to remove into the right folder
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
+
+                    // Absolute path
+                    if (first_char == '/') {
+                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 5);
+                        TracePrintf(0, "Removed directory with this inum: %d\n", inum_result);
+                    } else { // relative
+                        int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 5);
+                        TracePrintf(0, "Removed directory at this inum: %d\n", inum_result);
+                    }
+                    break;
+                case CHDIR_M:
+                case STAT_M:
+                case SYNC_M:
+                case SHUTDOWN_M:
+                    // See page - write cached to disk
+                    // TODO: Informative message
+                    TracePrintf(0, "EXITING\n");
+                    struct my_msg exit_message = {.type = SHUTDOWN_M, .data1 = -1};
+                    Reply((void *) &exit_message, client_pid);
+                    Exit(1);
+                    break;
+                default:
+                    TracePrintf(0, "CRITICIAL: Invalid message sent!");
+            }
+
+            // Just reply with some message
+            struct my_msg some_message;
+            Reply((void *) &some_message, client_pid);
+
+
+            // Free the current message
+            free(message);
         }
-
-
-        // Free the current message
-        free(message);
 
         // Free block holder
         free(first_block);
@@ -349,7 +372,7 @@ int find_free_block() {
 }
 
 // return inode number to open
-// have different modes: 1 - open a FILE, 2 - create a FILE, 3 - open a DIR, 4 - create a DIR
+// have different modes: 1 - open a FILE, 2 - create a FILE, 3 - open a DIR, 4 - create a DIR, 5 - remove a dir
 int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) {
     struct inode *curr_inode = (struct inode *) (first_block + curr_inum * sizeof(struct inode));
     // Check if this is the last one
@@ -419,15 +442,35 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                         // Make sure is file
                         struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
                         TracePrintf(0, "Block number: %d\n", file_inode->direct[0]);
-                        if (file_inode->type == INODE_REGULAR) {
-                            free(current_block);
-                            free(temp_pathname);
-                            return curr_dir_entry->inum;
-                        } else {
-                            free(current_block);
-                            free(temp_pathname);
-                            return ERROR;
+                        if (mode == 1) {
+                            if (file_inode->type == INODE_REGULAR) {
+                                free(current_block);
+                                free(temp_pathname);
+                                return curr_dir_entry->inum;
+                            } else {
+                                free(current_block);
+                                free(temp_pathname);
+                                return ERROR;
+                            }
+                        } else if (mode == 5) { // delete directory
+                            if (file_inode->type == INODE_DIRECTORY) {
+                                // don't remove . and .. and root
+                                if (curr_dir_entry->inum == ROOTINODE || strcmp(curr_dir_entry->name, ".") == 0 || strcmp(curr_dir_entry->name, "..") == 0 ){
+                                    TracePrintf(0, "Trying to remove root or . or ..\n");
+                                    return ERROR;
+                                }
+                                remove_inode(curr_dir_entry->inum);
+                                curr_dir_entry->inum = 0;
+                                memset(curr_dir_entry->name, '\0', DIRNAMELEN);
+                                // Write this to block
+                                if ((c = WriteSector((int) curr_inode->direct[i], current_block)) == ERROR) {
+                                    return ERROR;
+                                }
+
+                                return 0;
+                            }
                         }
+                        
                         
                     }
                 }
@@ -457,7 +500,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
             }
 
             // If is create, append
-            if (mode == 2 || mode == 4) {
+            if (reached_file && (mode == 2 || mode == 4)) {
                 // Only if we're still in the block we can append a dir_entry
                 if (j * sizeof(struct dir_entry) < BLOCKSIZE) {
                     TracePrintf(0, "location: %d\n", j);
@@ -472,7 +515,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     // Write to disk
                     TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
                     if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
-                        return ERROR;
+                      return ERROR;
                     }
 
                     return dir_entry_to_insert.inum;
@@ -480,6 +523,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
             }
             
             free(current_block);
+            
         }
     }
 
@@ -530,22 +574,24 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                     TracePrintf(0, "Found folder, recursively calling\n");
                     return check_folder(curr_dir_entry->inum, curr_pathname, curr_inum, mode);
                 } else {
-                    TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
-                    // Make sure is file
-                    struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
-                    if (file_inode->type == INODE_REGULAR) {
-                        free(indirect_block);
-                        free(temp_pathname);
-                        free(indirect_block_block);
-                        return curr_dir_entry->inum;
-                    } else {
-                        free(indirect_block);
-                        free(temp_pathname);
-                        free(indirect_block_block);
-                        return ERROR;
+                    if (mode == 1) {
+                        TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
+                        // Make sure is file
+                        struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                        if (file_inode->type == INODE_REGULAR) {
+                            free(indirect_block);
+                            free(temp_pathname);
+                            free(indirect_block_block);
+                            return curr_dir_entry->inum;
+                        } else {
+                            free(indirect_block);
+                            free(temp_pathname);
+                            free(indirect_block_block);
+                            return ERROR;
+                        }
                     }
                     
-                }
+                } 
             }
 
             // if is last file and we are creating file, check the dir_entry to see if empty
@@ -594,6 +640,9 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                 return dir_entry_to_insert.inum;
             }
         }
+
+        
+       
 
         
     }
@@ -664,4 +713,52 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
     TracePrintf(0, "creating/opening file\n");
 
     return entry_to_ins;
+}
+
+// return ERROR if error, otherwise return 1
+int remove_inode(int inum) {
+    struct inode *inode_to_remove = (struct inode *) (first_block + inum * sizeof(struct inode));
+    // If folder, ensure there is only . and ..
+    if (inode_to_remove->type == INODE_DIRECTORY) {
+        // throw error if have more than 2 * dir_entry
+        if (inode_to_remove->size > 2 * (int) sizeof(struct dir_entry)) {
+            return ERROR;
+        }
+    }
+
+    // Set inode to free among other things
+    free_inodes[inum] = 0;
+    inode_to_remove->type = INODE_FREE;
+    inode_to_remove->nlink = 0;
+    inode_to_remove->reuse = 0;
+    inode_to_remove->size = 0;
+    
+    // Direct Blocks
+    int i;
+    for (i = 0; i < NUM_DIRECT; i++) {
+        free_blocks[inode_to_remove->direct[i]] = 0;
+    }
+    // Indirect block
+    //int indirect_block_num = inode_to_remove->indirect;
+    void *indirect_block = malloc(BLOCKSIZE);
+    if ((c = ReadSector(inode_to_remove->indirect, indirect_block)) == ERROR) {
+        free(indirect_block);
+        return ERROR;
+    }
+    
+    for (i = 0; i < BLOCKSIZE / (int) sizeof(int); i++) {
+        TracePrintf(0, "Going THROUGH Indirect Block Entries!\n");
+        int *currentBlock = (int *) (indirect_block + i * sizeof(int));
+        if (*currentBlock != 0) {
+            free_blocks[*currentBlock] = 0;
+        }
+    }
+    
+    free(indirect_block);
+    // Write to first block
+    if ((c = WriteSector(1, first_block)) == ERROR) {
+        return ERROR;
+    }
+
+    return 1;
 }
