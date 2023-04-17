@@ -18,6 +18,7 @@
 struct my_msg {
     int type;
     int data1;
-    char data2[16];
+    int data2;
+    char data3[12];
     void *ptr;
 };

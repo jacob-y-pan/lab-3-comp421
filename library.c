@@ -15,6 +15,7 @@ struct info_file{
 };
 struct info_file file_info_collection[MAX_OPEN_FILES];
 int lowest_fd;
+int current_inum = ROOTINODE;
 
 
 /** global array of structs that represents the current file locations */
@@ -37,7 +38,7 @@ int find_lowest_fd(){
 }
 
 int Open(char *pathname) {
-    struct my_msg test_message = {.type = OPEN_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    struct my_msg test_message = {.type = OPEN_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
 
     //update the file descriptor.
@@ -84,7 +85,7 @@ int Close(int fd) {
 
 int Create(char *pathname) {
     TracePrintf(0, "In create\n");
-    struct my_msg test_message = {.type = CREATE_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    struct my_msg test_message = {.type = CREATE_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     
     //TODO update open or closed? 
@@ -141,7 +142,7 @@ int ReadLink(char *pathname, char *buf, int len) {
 
 int MkDir(char *pathname) {
     TracePrintf(0, "In mkdir\n");
-    struct my_msg test_message = {.type = MKDIR_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    struct my_msg test_message = {.type = MKDIR_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     
     return 0;
@@ -156,7 +157,13 @@ int RmDir(char *pathname) {
 }
 
 int ChDir(char *pathname) {
-    (void) pathname;
+    TracePrintf(0, "In ChDir\n");
+    struct my_msg test_message = {.type = CHDIR_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
+
+    // Overriden, make old current dir the new one
+    current_inum = test_message.data2;
+
     return 0;
 }
 
