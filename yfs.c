@@ -811,7 +811,8 @@ int remove_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, i
     }
 
     // reduce size of parent_inode because removing dir_entry
-    parent_inode->size -= (int) sizeof(struct dir_entry);
+    // NOTE: DONT DO THIS! Just check if inum is 0!
+    // parent_inode->size -= (int) sizeof(struct dir_entry);
 
     // Set inode to free among other things
     free_inodes[inum] = 0;
