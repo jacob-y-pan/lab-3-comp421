@@ -88,7 +88,7 @@ int Create(char *pathname) {
     struct my_msg test_message = {.type = CREATE_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     
-    //TODO update open or closed? 
+    //TODO Need to open file 
 
     return 0;
 }
@@ -168,8 +168,12 @@ int ChDir(char *pathname) {
 }
 
 int Stat(char *pathname, struct Stat *statbuf) {
-    (void) pathname;
-    (void) statbuf;
+    TracePrintf(0, "In Stat\n");
+    
+    struct my_msg test_message = {.type = STAT_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr2 = (void *) statbuf, .ptr = (void *) pathname};
+    // add pointer to stat buf inside data3
+    Send((void *) &test_message, -FILE_SERVER);
+
     return 0;
 }
 

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <comp421/iolib.h>
 
 #include "yfs_header.h"
 
@@ -166,6 +167,7 @@ main(int argc, char **argv)
             char *token;
             // Message to reply back with
             struct my_msg reply_message;
+            int inum_result = -1;
             switch (message_type) {
                 case OPEN_M:
                     TracePrintf(0, "In open inside YFS\n");
@@ -179,15 +181,19 @@ main(int argc, char **argv)
 
                     // Split the pathname by /
                     first_char = pathname[0];
+                    // Add . if last char is /
+                    if (pathname[strlen(pathname) - 1] == '/') {
+                        pathname[strlen(pathname)] = '.';
+                    }
                     token = strtok(pathname, "/");
 
                     // Check if absolute or relative
                     if (first_char == '/') { // absolute
                         // Use root inode
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 1);
+                         inum_result = check_folder(message->data2, token, message->data2, 1);
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     }
 
@@ -204,10 +210,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
+                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2);
                         TracePrintf(0, "Created file with this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 2);
+                         inum_result = check_folder(message->data2, token, message->data2, 2);
                         TracePrintf(0, "Created file at this inum: %d\n", inum_result);
                     }
 
@@ -302,10 +308,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 4);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 4);
                         TracePrintf(0, "Created directory with this inum: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 4);
+                        inum_result = check_folder(message->data2, token, message->data2, 4);
                         TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
                     }
                     break;
@@ -319,10 +325,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                        int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 5);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 5);
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     } else { // relative
-                        int inum_result = check_folder(message->data2, token, message->data2, 5);
+                        inum_result = check_folder(message->data2, token, message->data2, 5);
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     }
                     break;
@@ -334,7 +340,7 @@ main(int argc, char **argv)
                     first_char = pathname[0];
                     token = strtok(pathname, "/");
                     // Absolute path
-                    int inum_result;
+                    
                     if (first_char == '/') {
                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 6);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
@@ -342,9 +348,35 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 6);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
                     }
-                    reply_message.data2 = inum_result;
                     break;
                 case STAT_M:
+                    TracePrintf(0, "In STAT inside YFS\n");
+                    // Copy the pathname
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    struct Stat statbufholder;
+                    // Now have pathname, try to remove into the right folder
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
+                    // Can just use open because returning inum
+                    // Absolute path
+                    if (first_char == '/') {
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 1);
+                    } else { // relative
+                        inum_result = check_folder(message->data2, token, message->data2, 1);
+                    }
+                    // Store into stat
+                    struct inode *stat_inode = (struct inode *) (first_block + inum_result * sizeof(struct inode));
+                    statbufholder.inum = inum_result;
+                    statbufholder.type = stat_inode->type;
+                    statbufholder.size = stat_inode->size;
+                    statbufholder.nlink = stat_inode->nlink;
+
+                    // Write to the buffer
+                    TracePrintf(0, "Stat inode: %d\n", statbufholder.inum);
+                    struct Stat *client_buffer = (struct Stat *) message->ptr2;
+                    CopyTo(client_pid, (void *) client_buffer, &statbufholder, sizeof(statbufholder));
+
+                    break;
                 case SYNC_M:
                 case SHUTDOWN_M:
                     // See page - write cached to disk
@@ -358,8 +390,14 @@ main(int argc, char **argv)
                     TracePrintf(0, "CRITICIAL: Invalid message sent!\n");
             }
 
+            // Set up reply message
+            reply_message.type = message_type;
+            reply_message.data2 = inum_result;
+
             // Clean up data
             memset(&pathname, '\0', MAXPATHNAMELEN);
+
+            // Actually reply
             Reply((void *) &reply_message, client_pid);
 
             // Free the current message
@@ -385,6 +423,15 @@ int find_free_inode() {
     for (i = 2; i < num_inodes+1; i++) {
         TracePrintf(0, "we are at index %d for free inodes\n", i);
         if (free_inodes[i] == 0) {
+            // Increment reuse
+            if ((c = ReadSector(1, first_block)) == ERROR) {
+                return ERROR;
+            }
+            struct inode *this_inode = (first_block + i * sizeof(struct inode));
+            this_inode->reuse += 1;
+            if ((c = WriteSector(1, first_block)) == ERROR) {
+                return ERROR;
+            }
             free_inodes[i] = 1;
             TracePrintf(0, "Inode that we are gonna use: %d\n", i);
             return i;
@@ -724,8 +771,14 @@ int open_file_inode(struct dir_entry *this_dir_entry) {
 // file_dir: 1 if file, 0 if dir
 // append boolean
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append) {
-    struct dir_entry entry_to_ins = {.inum = find_free_inode()};
     TracePrintf(0, "creating folder or file %s\n", actual_filename);
+    struct dir_entry null_entry = {.inum = -1, .name = ""};
+    // throw error if filename > DIRNAMELEN
+    if (strlen(actual_filename) > DIRNAMELEN) {
+        TracePrintf(3, "ERROR: Filename too long\n");
+        return null_entry;
+    }
+    struct dir_entry entry_to_ins = {.inum = find_free_inode()};
     // make everything null terminated for now
     memset(&entry_to_ins.name, '\0', DIRNAMELEN);
     strncpy(entry_to_ins.name, actual_filename, strlen(actual_filename));
@@ -752,8 +805,7 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         void *temp_block_for_insert = malloc(BLOCKSIZE);
         if ((c = ReadSector(insert_inode->direct[0], temp_block_for_insert)) == ERROR) {
             free(temp_block_for_insert);
-            entry_to_ins.inum = -1;
-            return entry_to_ins;
+            return null_entry;
         }
         // .
         struct dir_entry this_entry = {.inum = entry_to_ins.inum, .name = "."};
@@ -765,16 +817,14 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         insert_inode->size += 2 * sizeof(struct dir_entry);
         if ((c = WriteSector(insert_inode->direct[0], temp_block_for_insert)) == ERROR) {
             free(temp_block_for_insert);
-            entry_to_ins.inum = -1;
-            return entry_to_ins;
+            return null_entry;
         }
         free(temp_block_for_insert);
     }
 
     // Edit inode, overwrite first block
     if ((c = WriteSector(1, first_block)) == ERROR) {
-        entry_to_ins.inum = -1;
-        return entry_to_ins;
+        return null_entry;
     }
 
     TracePrintf(0, "creating/opening file\n");
@@ -800,7 +850,8 @@ int remove_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, i
     }
 
     // reduce size of parent_inode because removing dir_entry
-    parent_inode->size -= (int) sizeof(struct dir_entry);
+    // NOTE: DONT DO THIS! Just check if inum is 0!
+    // parent_inode->size -= (int) sizeof(struct dir_entry);
 
     // Set inode to free among other things
     free_inodes[inum] = 0;

@@ -15,10 +15,17 @@ main()
         // fd = Create("/file00");
         // Open("file00");
 
-        //MkDir("testfolder3");
-        //MkDir("testfolder5");
-        RmDir("testfolder5");
-        
+        // MkDir("testfolder3/bingofolder");
+        // RmDir("testfolder3/bingofolder");
+        MkDir("newfolder3");
+        MkDir("newfolder3/newnewfolder");
+        ChDir("newfolder3");
+        MkDir("newnewfolder2");
+        Create("test.txt");
+        struct Stat statbuf;
+        Stat("test.txt", &statbuf);
+
+        printf("Stat test: %d\n", statbuf.inum);
 
         (void) fd;
 
