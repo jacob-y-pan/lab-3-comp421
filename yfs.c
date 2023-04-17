@@ -157,7 +157,7 @@ main(int argc, char **argv)
         current_inode_directory = ROOTINODE;
 
         // Receive from the client a message
-        while (true) {
+        while (1) {
             struct my_msg *message = malloc(sizeof(struct my_msg));
             int client_pid = Receive((void *) message);
             TracePrintf(0, "Client pid: %d\n", client_pid);

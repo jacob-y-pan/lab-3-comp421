@@ -23,6 +23,16 @@ int find_lowest_fd(){
 
     //if(file_info_collection) return 0;
 
+    //file descriptor begins with 0 --> MAX_OPEN_FILES goes from 0 to MAX_OPEN_FILES - 1
+
+    int fd_index;
+    for(fd_index = 0; fd_index < MAX_OPEN_FILES; fd_index++)
+    {
+        if(file_info_collection[fd_index].open_close == 0)
+        {
+            return fd_index;
+        }
+    }
     return -1;
 }
 
@@ -63,7 +73,10 @@ int Close(int fd) {
     
     Send((void *) &test_message, -FILE_SERVER);
 
-    
+    file_info_collection[fd].inode = 0;
+    file_info_collection[fd].pos = 0;
+    file_info_collection[fd].fd = lowest_fd;
+    file_info_collection[fd].open_close = 0;
 
     TracePrintf(0, "In close\n");
     return 0;
@@ -135,7 +148,10 @@ int MkDir(char *pathname) {
 }
 
 int RmDir(char *pathname) {
-    (void) pathname;
+    TracePrintf(0, "In rmdir\n");
+    struct my_msg test_message = {.type = RMDIR_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
+    
     return 0;
 }
 

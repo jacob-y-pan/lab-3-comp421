@@ -15,7 +15,10 @@ main()
         // fd = Create("/file00");
         // Open("file00");
 
-        MkDir("testfolder3");
+        //MkDir("testfolder3");
+        //MkDir("testfolder5");
+        RmDir("testfolder5");
+        
 
         (void) fd;
 
