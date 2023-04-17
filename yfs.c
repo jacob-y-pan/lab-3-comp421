@@ -809,8 +809,12 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         }
         // .
         struct dir_entry this_entry = {.inum = entry_to_ins.inum, .name = "."};
+        insert_inode->nlink += 1;
         // ..
         struct dir_entry parent_entry = {.inum = parent_inum, .name = ".."};
+        struct inode *parent_inode = (struct inode *) (first_block + parent_inum * sizeof(struct inode));
+        parent_inode->nlink += 1;
+
         memcpy(temp_block_for_insert, &this_entry, sizeof(struct dir_entry));
         memcpy(temp_block_for_insert + sizeof(struct dir_entry), &parent_entry, sizeof(struct dir_entry));
         // increase size
