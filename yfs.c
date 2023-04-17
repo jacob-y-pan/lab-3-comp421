@@ -27,7 +27,8 @@ int find_free_inode();
 int find_free_block();
 int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode);
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append);
-int remove_inode(int inum);
+int open_file_inode(struct dir_entry *this_dir_entry);
+int remove_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, int this_index, void *this_block, int direct_indirect);
 
 // Helper Functions
 
@@ -298,10 +299,10 @@ main(int argc, char **argv)
                     // Absolute path
                     if (first_char == '/') {
                         int inum_result = check_folder(ROOTINODE, token, ROOTINODE, 5);
-                        TracePrintf(0, "Removed directory with this inum: %d\n", inum_result);
+                        TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     } else { // relative
                         int inum_result = check_folder(current_inode_directory, token, current_inode_directory, 5);
-                        TracePrintf(0, "Removed directory at this inum: %d\n", inum_result);
+                        TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     }
                     break;
                 case CHDIR_M:
@@ -319,6 +320,8 @@ main(int argc, char **argv)
                     TracePrintf(0, "CRITICIAL: Invalid message sent!\n");
             }
 
+            // Clean up data
+            memset(&pathname, '\0', MAXPATHNAMELEN);
             // Just reply with some message
             struct my_msg some_message;
             Reply((void *) &some_message, client_pid);
@@ -372,7 +375,7 @@ int find_free_block() {
 }
 
 // return inode number to open
-// have different modes: 1 - open a FILE, 2 - create a FILE, 3 - open a DIR, 4 - create a DIR, 5 - remove a dir
+// have different modes: 1 - open a FILE, 2 - create a FILE, 3 - open a DIR (not valid), 4 - create a DIR, 5 - remove a dir
 int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) {
     struct inode *curr_inode = (struct inode *) (first_block + curr_inum * sizeof(struct inode));
     // Check if this is the last one
@@ -439,48 +442,32 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                         return check_folder(curr_dir_entry->inum, curr_pathname, curr_inum, mode);
                     } else {
                         TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
-                        // Make sure is file
-                        struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
-                        TracePrintf(0, "Block number: %d\n", file_inode->direct[0]);
                         if (mode == 1) { // we are opening the file
-                            if (file_inode->type == INODE_REGULAR) {
-                                free(current_block);
-                                free(temp_pathname);
-                                return curr_dir_entry->inum;
-                            } else {
-                                free(current_block);
-                                free(temp_pathname);
-                                return ERROR;
-                            }
-                        } else if (mode == 5) { // delete directory
-                            if (file_inode->type == INODE_DIRECTORY) {
-                                // don't remove . and .. and root
-                                if (curr_dir_entry->inum == ROOTINODE || strcmp(curr_dir_entry->name, ".") == 0 || strcmp(curr_dir_entry->name, "..") == 0 ){
-                                    TracePrintf(0, "Trying to remove root or . or ..\n");
-                                    return ERROR;
-                                }
-                                remove_inode(curr_dir_entry->inum);
-                                curr_dir_entry->inum = 0;
-                                memset(curr_dir_entry->name, '\0', DIRNAMELEN);
-                                // Write this to block
-                                if ((c = WriteSector((int) curr_inode->direct[i], current_block)) == ERROR) {
-                                    return ERROR;
-                                }
-
-                                return 0;
-                            }
+                            TracePrintf(0, "OPening the file\n");
+                            free(current_block);
+                            free(temp_pathname);
+                            return open_file_inode(curr_dir_entry);
                         } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
                             TracePrintf(0, "ERROR: file already created!\n");
                             free(current_block);
                             free(temp_pathname);
                             return ERROR;
-                        }
+                        } else if (mode == 5) { // delete directory
+                            struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                            if (file_inode->type == INODE_DIRECTORY) {
+                                TracePrintf(0, "Deleting the directory\n");
+                                int temp = remove_inode(curr_inode, curr_dir_entry, i, current_block, 1);
+                                free(current_block);
+                                free(temp_pathname);
+                                return temp;
+                            }
+                        } 
                         
                         
                     }
                 }
 
-                // if is last file and we are creating file, check the dir_entry to see if empty
+                // if is last file in recursive function and we are creating file, check the dir_entry to see if empty
                 // If is create, edit
                 if (reached_file && (mode == 2 || mode == 4)) {
                     // Only if we're still in the block we can append a dir_entry
@@ -584,49 +571,27 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
                 } else {
                     TracePrintf(0, "FOUND FILE - file num is %d\n", curr_dir_entry->inum);
                     // Make sure is file
-                    struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
                     if (mode == 1) {
-                        if (file_inode->type == INODE_REGULAR) {
-                            free(indirect_block);
-                            free(temp_pathname);
-                            free(indirect_block_block);
-                            return curr_dir_entry->inum;
-                        } else {
-                            free(indirect_block);
-                            free(temp_pathname);
-                            free(indirect_block_block);
-                            return ERROR;
-                        }
-                    } else if (mode == 5) { // delete directory
-                        if (file_inode->type == INODE_DIRECTORY) {
-                            // don't remove . and .. and root
-                            if (curr_dir_entry->inum == ROOTINODE || strcmp(curr_dir_entry->name, ".") == 0 || strcmp(curr_dir_entry->name, "..") == 0 ){
-                                TracePrintf(0, "Trying to remove root or . or ..\n");
-                                free(indirect_block);
-                                free(temp_pathname);
-                                free(indirect_block_block);
-                                return ERROR;
-                            }
-                            remove_inode(curr_dir_entry->inum);
-                            curr_dir_entry->inum = 0;
-                            memset(curr_dir_entry->name, '\0', DIRNAMELEN);
-                            // Write this to block
-                            if ((c = WriteSector(*indirect_inum, indirect_block_block)) == ERROR) {
-                                free(indirect_block);
-                                free(temp_pathname);
-                                free(indirect_block_block);
-                                return ERROR;
-                            }
-
-                            return 0;
-                        }
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return open_file_inode(curr_dir_entry);
                     } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
                         TracePrintf(0, "ERROR: file already created!\n");
                         free(indirect_block);
                         free(temp_pathname);
                         free(indirect_block_block);
                         return ERROR;
-                    }
+                    } else if (mode == 5) { // delete directory
+                        struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                        if (file_inode->type == INODE_DIRECTORY) {
+                            int temp = remove_inode(curr_inode, curr_dir_entry, *indirect_inum, indirect_block_block, 0);
+                            free(indirect_block);
+                            free(temp_pathname);
+                            free(indirect_block_block);
+                            return temp;
+                        }
+                    } 
                     
                 } 
             }
@@ -691,6 +656,17 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode) 
     return ERROR;
 }
 
+// Open an inode
+int open_file_inode(struct dir_entry *this_dir_entry) {
+    struct inode *file_inode = (struct inode *) (first_block + this_dir_entry->inum * sizeof(struct inode));
+    // Make sure is file
+    if (file_inode->type == INODE_REGULAR) {
+        return this_dir_entry->inum;
+    } else {
+        return ERROR;
+    }
+}
+
 // Create file or directory, return dir_entry (to append or overwrite)
 // file_dir: 1 if file, 0 if dir
 // append boolean
@@ -699,9 +675,10 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
     TracePrintf(0, "creating folder or file %s\n", actual_filename);
     strncpy(entry_to_ins.name, actual_filename, strlen(actual_filename));
     // add null terminators to end
-    if (sizeof(actual_filename) < DIRNAMELEN) {
+    if (strlen(actual_filename) < DIRNAMELEN) {
         memset(&entry_to_ins.name + strlen(actual_filename) + 1, '\0', DIRNAMELEN - strlen(actual_filename));
     }
+    TracePrintf(0, "Name: %s\n", entry_to_ins.name);
     // Add size to parent
     if (append == 1) {
         TracePrintf(0, "appending to parent\n");
@@ -752,8 +729,14 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
     return entry_to_ins;
 }
 
-// return ERROR if error, otherwise return 1
-int remove_inode(int inum) {
+// return ERROR if error, otherwise return 0
+int remove_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, int this_index, void *this_block, int direct_indirect) {
+    // don't remove . and .. and root
+    if (this_dir_entry->inum == ROOTINODE || strcmp(this_dir_entry->name, ".") == 0 || strcmp(this_dir_entry->name, "..") == 0 ) {
+        TracePrintf(0, "Trying to remove root or . or ..\n");
+        return ERROR;
+    }
+    int inum = this_dir_entry->inum;
     struct inode *inode_to_remove = (struct inode *) (first_block + inum * sizeof(struct inode));
     // If folder, ensure there is only . and ..
     if (inode_to_remove->type == INODE_DIRECTORY) {
@@ -784,7 +767,7 @@ int remove_inode(int inum) {
     }
     
     for (i = 0; i < BLOCKSIZE / (int) sizeof(int); i++) {
-        TracePrintf(0, "Going THROUGH Indirect Block Entries!\n");
+        // TracePrintf(0, "Going THROUGH Indirect Block Entries!\n");
         int *currentBlock = (int *) (indirect_block + i * sizeof(int));
         if (*currentBlock != 0) {
             free_blocks[*currentBlock] = 0;
@@ -797,5 +780,24 @@ int remove_inode(int inum) {
         return ERROR;
     }
 
-    return 1;
+    // Set everything to empty in this dir_entry
+    TracePrintf(0, "File name: %s\n", this_dir_entry->name);
+    this_dir_entry->inum = 0;
+    memset(this_dir_entry->name, '\0', DIRNAMELEN);
+    
+    // Write this to block
+    int block_num;
+    if (direct_indirect == 1) {
+        block_num = parent_inode->direct[this_index];
+    } else {
+        block_num = this_index;
+    }
+    TracePrintf(0, "Block removed: %d, %d %p\n", this_index, block_num, this_block);
+    if ((c = WriteSector(block_num, this_block)) == ERROR) {
+        return ERROR;
+    }
+
+    TracePrintf(0, "Finished removing\n");
+
+    return 0;
 }

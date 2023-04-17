@@ -135,7 +135,9 @@ int MkDir(char *pathname) {
 }
 
 int RmDir(char *pathname) {
-    (void) pathname;
+    TracePrintf(0, "In rmdir\n");
+    struct my_msg test_message = {.type = RMDIR_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
     return 0;
 }
 
