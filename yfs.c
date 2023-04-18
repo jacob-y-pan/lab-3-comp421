@@ -211,6 +211,11 @@ main(int argc, char **argv)
                         TracePrintf(0, "Created file at this inum: %d\n", inum_result);
                     }
 
+                    first_block = malloc(BLOCKSIZE);
+                    if ((c = ReadSector(1, (void *) first_block)) == ERROR) {
+                        return ERROR;
+                    }
+
                     // // Begin at root node
                     // if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
                     //     // Assume is just file and doesn't already exist
@@ -266,14 +271,108 @@ main(int argc, char **argv)
 
                     // Reads a specific inode at the right time;
 
-                    // Specific data fields --> data1 (position), data2 (buffer), data3
+                    // READ message: Specific data fields --> data1 (inode number), data2 (read number), data3 (position of the file),
+                    // ptr (buffer to read)
                     int inode_check = (int) message->data1;
                     int number_to_read = (int) message->data2;
+                    int current_position = (int) message->data3;
+                    void * buf_readTo = (void *) message->ptr;
 
                     TracePrintf(0, "Reading file with inode num %d", inode_check);
                     TracePrintf(0, "Amount to Read %d", number_to_read);
                     // read bugffer + size, to check
 
+                    
+
+                    void * first_block = malloc(BLOCK_SIZE);
+                    if(... //READ INB BLOCK SIZES -->)
+                    struct inode *curr_inode = (struct inode *) (first_block + curr_inum * sizeof(struct inode));
+                    TracePrintf(3, " current_position: %d", current_position);
+                    
+                    void *current_block = malloc(BLOCKSIZE);
+
+                    TracePrintf(0, "Current direct : %d\n", );
+                    
+                    //direct blocks
+                    int blockToLookIn = (int) current_position / BLOCKSIZE - 1;
+                    TracePrintf(3, " block it's in: %d", blockToLookIn);
+                    if(blockToLookIn < NUM_DIRECT)
+                    {
+                        TracePrintf(0, "Position to Read In Block is in Direct Blocks");
+                    }
+                    else
+                    {
+                        TracePrintf(0, "Position to Read is in Indirect Blocks");
+                    }
+
+                    int positionInBlock = current_position % BLOCK_SIZE;
+                    if( (current_position % BLOCKSIZE) + number_to_read < curr_inode->size)
+                    {
+                        // can read!
+                        int number_to_read;
+                        TracePrintf(0, "READ 1: Enough to Read 1");
+                        
+                    }
+                    else{
+                        int number_to_read = curr_inode->size - (current_position % BLOCKSIZE);
+                    }
+
+                    int case = 0;
+                    //
+
+                    // READ Sector of the corresponding region.
+
+                    //CASE 1
+                    if(blockToLookIn < NUM_DIRECT)
+                    {
+                        //Read the Direct i normally
+                         if ((c = ReadSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
+                            free(current_block);
+                            return ERROR;
+                        }
+
+                        
+                        //number of bytes to read in the block --> current block pointer
+                        // block To Read. memcpy into the buffer for receiving.
+                        memcpy(current_block + positionInBlock, blockToRead, number_to_read);
+
+                    }
+                    else{
+                        
+                        // read the Indirect Block for Guidance
+
+
+
+                    }
+                   
+
+                    TracePrintf(0, "Copying contents over: Block Used: %d", blockToLookIn);
+                    
+
+                    for(int j = 0; j ) 
+
+
+
+
+                    //indirect blocks
+                    int j = 0;
+                    for(j = 0; )
+
+
+                    int i = 0;
+                    for( i = 0; i < NUM_DIRECT; i++)
+                    {
+                        int i = 0; 
+                        if()
+                        {
+
+                        }
+
+                    } 
+
+                       
+                            
+                    
                     
                     // 
 
