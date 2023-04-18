@@ -234,59 +234,10 @@ main(int argc, char **argv)
                     }
 
                     reply_result = inum_result;
-
-                    // // Begin at root node
-                    // if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
-                    //     // Assume is just file and doesn't already exist
-                    //     struct dir_entry entry_to_ins = {.inum = find_free_inode((int *) free_inodes)};
-                    //     // copy pathname to the entry
-                    //     char *token = strtok(pathname, "/");
-                    //     strncpy(entry_to_ins.name, token, strlen(token));
-                    //     // add null terminators to end
-                    //     if (sizeof(pathname) < DIRNAMELEN) {
-                    //         memset(entry_to_ins.name + sizeof(pathname), '\0', DIRNAMELEN - sizeof(pathname));
-                    //     }
-                    //     // Edit root inode page and root inode
-                    //     TracePrintf(0, "Block id: %d\n", (int) root_inode->direct[0]);
-                    //     void *block_to_edit = malloc(BLOCKSIZE);
-                    //     // TODO: See if all the direct blocks are full, check indirect
-                    //     if ((c = ReadSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
-                    //         return ERROR;
-                    //     }
-                    //     // Check if any dir_entries are 0
-                    //     int num_dir_entries = root_inode->size / sizeof(struct dir_entry);
-                    //     int j;
-                    //     for (j = 0; j < num_dir_entries; j++) {
-                    //         struct dir_entry *curr_dir_entry = (struct dir_entry *) (block_to_edit + j * sizeof(struct dir_entry));
-                    //         if (curr_dir_entry->inum == 0) { // This means this dir is free
-                    //             TracePrintf(0, "Found an empty dir entry, inserting\n");
-                    //             curr_dir_entry->inum = entry_to_ins.inum;
-                    //             memcpy(curr_dir_entry->name, entry_to_ins.name, DIRNAMELEN);
-                    //             break;
-                    //         }
-                    //     }
-                    //     // If didn't find anything, append
-                    //     if (j == num_dir_entries) {
-                    //         memcpy(block_to_edit + num_dir_entries * sizeof(struct dir_entry), &entry_to_ins, sizeof(entry_to_ins));
-                    //         root_inode->size += sizeof(struct dir_entry);
-                    //     }
-                    //     // Write to the sector
-                    //     if ((c = WriteSector((int) root_inode->direct[0], block_to_edit)) == ERROR) {
-                    //         return ERROR;
-                    //     }
-                    //     // Write to the root inode
-                    //     // Write to the sector
-                    //     if ((c = WriteSector(ROOTINODE, first_block)) == ERROR) {
-                    //         return ERROR;
-                    //     }
-
-                    // }
-
-                    
                     break;
                 case READ_M:
                     //Reads a specific file at the desired 
-                    TracePrintf(0, "Inside the Read function");
+                    TracePrintf(0, "Inside the Read function\n");
 
                     // Reads a specific inode at the right time;
 
@@ -297,11 +248,7 @@ main(int argc, char **argv)
                     current_position = (int) message->data3;
                     buf_readTo = (void *) message->ptr;
 
-                    TracePrintf(0, "Reading file with inode num %d", inode_check);
-                    TracePrintf(0, "Amount to Read %d", number_to_read);
-                    // read bugffer + size, to check
-
-                    
+                    int num_bytes_read;
 
                     first_block = malloc(BLOCKSIZE);
                     if ((c = ReadSector(1, first_block)) == ERROR) {
@@ -309,60 +256,41 @@ main(int argc, char **argv)
                             return ERROR;
                     }
                     
-                    //if(... //READ INB BLOCK SIZES -->)
                     struct inode *curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
-                    TracePrintf(3, " current_position: %d", current_position);
                     
                     void *current_block = malloc(BLOCKSIZE);
 
-                    //TracePrintf(0, "Current direct : %d\n", ) 
-                    
                     //direct blocks
-                    int blockToLookIn = (int) current_position / BLOCKSIZE - 1;
-                    TracePrintf(3, " block it's in: %d", blockToLookIn);
+                    int blockToLookIn = (int) current_position / BLOCKSIZE;
+                    TracePrintf(0, " block it's in: %d", blockToLookIn);
                     if(blockToLookIn < NUM_DIRECT)
                     {
-                        TracePrintf(0, "Position to Read In Block is in Direct Blocks");
+                        TracePrintf(0, "Position to Read In Block is in Direct Blocks\n");
                     }
                     else
                     {
-                        TracePrintf(0, "Position to Read is in Indirect Blocks");
+                        TracePrintf(0, "Position to Read is in Indirect Blocks\n");
                     }
 
-                    // TracePrintf(0, "Reading file with inode num %d", inode_check);
-                    // TracePrintf(0, "Amount to Read %d", number_to_read);
-                    // read bugffer + size, to check
-
-                     //if(... //READ INB BLOCK SIZES -->)
-                   
-
-
-                    TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE - 1);
+                    TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE);
                     // TracePrintf(0, "Current direct : %d\n", );
                     int positionInBlock = current_position % BLOCKSIZE;
                     //testing if greater than size of all bytes/size of file!
-                    if( (current_position % BLOCKSIZE) + number_to_read < curr_inode->size)
+                    if ((current_position % BLOCKSIZE) + number_to_read < curr_inode->size)
                     {
                         // can read!
                         TracePrintf(0, "READ 1: Enough to Read");
-                        
                     }
-                    else{
+                    else {
                         number_to_read = curr_inode->size - (current_position % BLOCKSIZE);
-
                     }
-
-                    //int case = 0;
-                    //(void * )case;
-                    
-                    //
 
                     // READ Sector of the corresponding region.
                     
                     //CASE 1
                     if( (blockToLookIn < NUM_DIRECT) && ((positionInBlock + number_to_read) < BLOCKSIZE) )
                     {
-                        TracePrintf(0, "Read Normally in First Case");
+                        TracePrintf(0, "Read Normally in First Case\n");
                         //assert(number)
                         //Read the Direct i normally
                         if ((c = ReadSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
@@ -375,6 +303,7 @@ main(int argc, char **argv)
                         // block To Read. memcpy into the buffer for receiving.
                         //CopyTo(current_block + positionInBlock, blockToRead, number_to_read);
                         CopyTo(client_pid, buf_readTo, current_block + positionInBlock, number_to_read);
+                        num_bytes_read = number_to_read;
                     }
                     else if( (blockToLookIn + 1 < NUM_DIRECT) && ((positionInBlock + number_to_read) > BLOCKSIZE)){
                         void * readBuffer = malloc(number_to_read+1);
@@ -442,28 +371,12 @@ main(int argc, char **argv)
 
                     } 
 
-                    TracePrintf(0, "End of READ File");
+                    TracePrintf(0, "End of READ File\n");
                     
-                     free(current_block);
-                  
+                    free(current_block);
 
-                       
-                            
-                    
-                    
-                    // 
-
-                    // yfs_header - open or closed.
-                    // yfs_header
-                    //memcpy(number_to_close, message->ptr);
-
-
-                    
+                    reply_result = num_bytes_read;
                     break;
-
-                    
-                     
-
                 case WRITE_M:
                     //Writes at a specific file at the desired location.
                      TracePrintf(0, "Inside the Write function");

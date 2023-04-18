@@ -115,9 +115,7 @@ int Create(char *pathname) {
 }
 
 int Read(int fd, void *buf, int size) {
-    (void) fd;
-    (void) buf;
-    (void) size;
+    TracePrintf(0, "IN read\n");
    
     struct my_msg test_message = {.type = READ_M, .data1 = file_info_collection[fd].inode, .data2 = size
     , .data3 = file_info_collection[fd].pos, .ptr = buf};
