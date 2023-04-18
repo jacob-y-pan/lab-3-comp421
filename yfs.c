@@ -292,10 +292,10 @@ main(int argc, char **argv)
 
                     // READ message: Specific data fields --> data1 (inode number), data2 (read number), data3 (position of the file),
                     // ptr (buffer to read)
-                    // inode_check = (int) message->data1;
-                    // number_to_read = (int) message->data2;
-                    // current_position = (int) message->data3;
-                    // buf_readTo = (void *) message->ptr;
+                    inode_check = (int) message->data1;
+                    number_to_read = (int) message->data2;
+                    current_position = (int) message->data3;
+                    buf_readTo = (void *) message->ptr;
 
                     TracePrintf(0, "Reading file with inode num %d", inode_check);
                     TracePrintf(0, "Amount to Read %d", number_to_read);
@@ -304,17 +304,18 @@ main(int argc, char **argv)
                     
 
                     first_block = malloc(BLOCKSIZE);
+                    if ((c = ReadSector(1, first_block)) == ERROR) {
+                            //free(current_block);bl
+                            return ERROR;
+                    }
+                    
                     //if(... //READ INB BLOCK SIZES -->)
                     struct inode *curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
                     TracePrintf(3, " current_position: %d", current_position);
                     
                     void *current_block = malloc(BLOCKSIZE);
 
-                    TracePrintf(0, "Current direct : %d\n", );
-                    
-                     struct inode *curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
-                    TracePrintf(3, " current_position: %d", current_position);
-                    
+                    //TracePrintf(0, "Current direct : %d\n", ) 
                     
                     //direct blocks
                     int blockToLookIn = (int) current_position / BLOCKSIZE - 1;
@@ -332,9 +333,7 @@ main(int argc, char **argv)
                     // TracePrintf(0, "Amount to Read %d", number_to_read);
                     // read bugffer + size, to check
 
-                    
-                    first_block = malloc(BLOCKSIZE);
-                    //if(... //READ INB BLOCK SIZES -->)
+                     //if(... //READ INB BLOCK SIZES -->)
                    
 
 
@@ -410,14 +409,18 @@ main(int argc, char **argv)
 
 
                     }
-                    else{
-                        
+                    else{       
 
-                    //indirect blocks
-                    int j = 0;
-                    for(j = 0; )
-
-                        int *indirect_inum = (int *) (NUM_DIRECT + blockIndirect * sizeof(int));
+                        //indirect blocks
+                          // read the Indirect Block for Block Directory
+                        if ((c = ReadSector((int) curr_inode->indirect, current_block)) == ERROR) {
+                            //free(current_block);
+                            return ERROR;
+                        }
+                        // actual number of blocks?
+                        int blockIndirect = blockToLookIn - NUM_DIRECT;
+      
+                        int *indirect_inum = (int *) (current_block + blockIndirect * sizeof(int));
                         (void) indirect_inum;
                         //TODO?
                         //current Block is actually pointing to the block of indirect Bloock!
@@ -427,10 +430,8 @@ main(int argc, char **argv)
                         }
 
 
-                        // actual number of blocks?
-                        int blockIndirect = blockToLookIn - NUM_DIRECT;
-
-                        int *indirect_inum = (int *) (current_block + blockIndirect * sizeof(int));
+                        
+                        indirect_inum = (int *) (current_block + blockIndirect * sizeof(int));
                         (void) indirect_inum;
                         //TODO?
                         //current Block is actually pointing to the block of indirect Bloock!
@@ -483,7 +484,11 @@ main(int argc, char **argv)
                     
 
                     first_block = malloc(BLOCKSIZE);
-                    //if(... //READ INB BLOCK SIZES -->)
+                    if ((c = ReadSector(1, first_block)) == ERROR) {
+                            //free(current_block);bl
+                            return ERROR;
+                    }
+
                     curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
                     TracePrintf(3, " current_position: %d", current_position);
                     
@@ -589,21 +594,21 @@ main(int argc, char **argv)
                     //case 3
                     else{
                         
-                        // read the Indirect Block for Guidance
-                        
+                        // read the Indirect Block for Block Directory
                         if ((c = ReadSector((int) curr_inode->indirect, current_block)) == ERROR) {
                             //free(current_block);
                             return ERROR;
                         }
 
-                        // actual number of blocks?
+                        // indirect block num
                         int blockIndirect = blockToLookIn - NUM_DIRECT;
 
-                        int *indirect_inum = (int *) (NUM_DIRECT + blockIndirect * sizeof(int));
-                        (void) indirect_inum;
+                        
+                        int *actualIndirectBlock = (int *) (current_block + blockIndirect * sizeof(int));
+                        
 
                         //current Block is actually pointing to the block of indirect Bloock!
-                        if ((c = ReadSector(blockIndirect, current_block)) == ERROR) {
+                        if ((c = ReadSector(*actualIndirectBlock, current_block)) == ERROR) {
                             free(current_block);
                             return ERROR;
                         }
@@ -611,7 +616,8 @@ main(int argc, char **argv)
                         //position in Block correlates to the actual byte number
                         CopyTo(client_pid, current_block + positionInBlock, buf_writeTo, number_to_write);
                        
-                        if ((c = WriteSector(blockIndirect, current_block)) == ERROR) {
+                       // Current Block is Written back into The Sector.
+                        if ((c = WriteSector(*actualIndirectBlock, current_block)) == ERROR) {
                             free(current_block);
                             return ERROR;
                         }
