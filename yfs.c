@@ -221,10 +221,10 @@ main(int argc, char **argv)
 
                     // Absolute path
                     if (first_char == '/') {
-                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2, 0);
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 2, 0);
                         TracePrintf(0, "Created file with this inum: %d\n", inum_result);
                     } else { // relative
-                         inum_result = check_folder(message->data2, token, message->data2, 2, 0);
+                        inum_result = check_folder(message->data2, token, message->data2, 2, 0);
                         TracePrintf(0, "Created file at this inum: %d\n", inum_result);
                     }
 
@@ -779,7 +779,7 @@ main(int argc, char **argv)
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     }
 
-                    if (inum_result > 0) {
+                    if (inum_result >= 0) {
                         reply_result = 0;
                     } else {
                         reply_result = ERROR;
@@ -979,7 +979,17 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
                             free(temp_pathname);
                             return open_file_inode(curr_dir_entry);
                         } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
-                            TracePrintf(0, "ERROR: file already created!\n");
+                            TracePrintf(0, "File/directory already created! If is file, clear out\n");
+                            if (mode == 2) { // Is file, can work with it
+                                TracePrintf(0, "Truncating size to 0\n");
+                                struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                                if (file_inode->type == INODE_REGULAR) {
+                                    file_inode->size = 0;
+                                    free(current_block);
+                                    free(temp_pathname);
+                                    return curr_dir_entry->inum;
+                                }
+                            }
                             free(current_block);
                             free(temp_pathname);
                             return ERROR;
@@ -1029,6 +1039,8 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
                         memcpy(curr_dir_entry, &dir_entry_to_insert, sizeof(struct dir_entry));
                         // Write to disk
                         if ((c = WriteSector((int) curr_inode->direct[i], current_block)) == ERROR) {
+                            free(current_block);
+                            free(temp_pathname);
                             return ERROR;
                         }
                         TracePrintf(0, "does it print here third\n");
@@ -1060,8 +1072,13 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
                     TracePrintf(0, "Copied\n");
                     TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
                     if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
-                      return ERROR;
+                        free(current_block);
+                        free(temp_pathname);
+                        return ERROR;
                     }
+
+                    free(current_block);
+                    free(temp_pathname);
 
                     return dir_entry_to_insert.inum;
                 }
@@ -1127,7 +1144,18 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
                         free(indirect_block_block);
                         return open_file_inode(curr_dir_entry);
                     } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
-                        TracePrintf(0, "ERROR: file already created!\n");
+                        TracePrintf(0, "File/directory already created! If is file, clear out\n");
+                        if (mode == 2) { // Is file, can work with it
+                            TracePrintf(0, "Truncating size to 0\n");
+                            struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                            if (file_inode->type == INODE_REGULAR) {
+                                file_inode->size = 0;
+                                free(indirect_block);
+                                free(temp_pathname);
+                                free(indirect_block_block);
+                                return curr_dir_entry->inum;
+                            }
+                        }
                         free(indirect_block);
                         free(temp_pathname);
                         free(indirect_block_block);
