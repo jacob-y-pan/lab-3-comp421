@@ -1,53 +1,170 @@
+** User     level 0 tracing enabled **
 ** YFS      level 0 tracing enabled **
+YFS      Making sure msg size is 32: 32
 YFS      Debug: Reading first block
+User     In create
 YFS      Fs_header values: num inodes: 47
+YFS      Block we're looking at: 2
+YFS      Block we're looking at: 2
 YFS      2th inode is free
+YFS      Block we're looking at: 2
 YFS      3th inode is free
+YFS      Block we're looking at: 2
 YFS      4th inode is free
+YFS      Block we're looking at: 2
 YFS      5th inode is free
+YFS      Block we're looking at: 2
 YFS      6th inode is free
+YFS      Block we're looking at: 2
 YFS      7th inode is free
+YFS      Block we're looking at: 2
 YFS      8th inode is free
+YFS      Block we're looking at: 2
 YFS      9th inode is free
+YFS      Block we're looking at: 3
 YFS      10th inode is free
+YFS      Block we're looking at: 3
 YFS      11th inode is free
+YFS      Block we're looking at: 3
 YFS      12th inode is free
+YFS      Block we're looking at: 3
 YFS      13th inode is free
+YFS      Block we're looking at: 3
 YFS      14th inode is free
+YFS      Block we're looking at: 3
 YFS      15th inode is free
+YFS      Block we're looking at: 3
 YFS      16th inode is free
+YFS      Block we're looking at: 3
 YFS      17th inode is free
+YFS      Block we're looking at: 3
 YFS      18th inode is free
+YFS      Block we're looking at: 4
 YFS      19th inode is free
+YFS      Block we're looking at: 4
 YFS      20th inode is free
+YFS      Block we're looking at: 4
 YFS      21th inode is free
+YFS      Block we're looking at: 4
 YFS      22th inode is free
+YFS      Block we're looking at: 4
 YFS      23th inode is free
+YFS      Block we're looking at: 4
 YFS      24th inode is free
+YFS      Block we're looking at: 4
 YFS      25th inode is free
+YFS      Block we're looking at: 4
 YFS      26th inode is free
+YFS      Block we're looking at: 4
 YFS      27th inode is free
+YFS      Block we're looking at: 5
 YFS      28th inode is free
+YFS      Block we're looking at: 5
 YFS      29th inode is free
+YFS      Block we're looking at: 5
 YFS      30th inode is free
+YFS      Block we're looking at: 5
 YFS      31th inode is free
+YFS      Block we're looking at: 5
 YFS      32th inode is free
+YFS      Block we're looking at: 5
 YFS      33th inode is free
+YFS      Block we're looking at: 5
 YFS      34th inode is free
+YFS      Block we're looking at: 5
 YFS      35th inode is free
+YFS      Block we're looking at: 5
 YFS      36th inode is free
+YFS      Block we're looking at: 6
 YFS      37th inode is free
+YFS      Block we're looking at: 6
 YFS      38th inode is free
+YFS      Block we're looking at: 6
 YFS      39th inode is free
+YFS      Block we're looking at: 6
 YFS      40th inode is free
+YFS      Block we're looking at: 6
 YFS      41th inode is free
+YFS      Block we're looking at: 6
 YFS      42th inode is free
+YFS      Block we're looking at: 6
 YFS      43th inode is free
+YFS      Block we're looking at: 6
 YFS      44th inode is free
+YFS      Block we're looking at: 6
 YFS      45th inode is free
+YFS      Block we're looking at: 7
 YFS      46th inode is free
+YFS      Block we're looking at: 7
 YFS      47th inode is free
 YFS      Client pid: 3
-YFS      file00
-YFS      parent
-YFS      6
+YFS      In CREATE inside YFS
+YFS      Current inode we're at: 1
+YFS      Num dir entries: 2
+YFS      Looking in direct
+YFS      Current direct block we're at: 7
+YFS      iterating through block with dir entries
+YFS      This dir entry: .
+YFS      This dir entry: ..
+YFS      location: 2
+YFS      creating folder or file a
+YFS      Looking for a free inode size 8
+YFS      we are at index 2 for free inodes
+YFS      Inode that we are gonna use: 2
+YFS      Name: a
+YFS      appending to parent
+YFS      parent size: 3
+YFS      Looking for a free block
+YFS      Block that we are gonna use: 8
+YFS      New block: 8
+YFS      creating/opening file
+YFS      Dir entry: 2 a
+YFS      0x228a0
+YFS      Copied
+YFS      Inum to write to: 7
+YFS      Created file with this inum: 2
+User     In Link
+YFS      Client pid: 3
+YFS      in LINK inside YFSYFS      Current inode we're at: 1
+YFS      Num dir entries: 3
+YFS      Looking in direct
+YFS      Current direct block we're at: 7
+YFS      iterating through block with dir entries
+YFS      This dir entry: .
+YFS      This dir entry: ..
+YFS      This dir entry: a
+YFS      FOUND FILE/FOLDER - file/folder num is 2
+YFS      OPening the file
+YFS      Current inode we're at: 1
+YFS      Num dir entries: 3
+YFS      Looking in direct
+YFS      Current direct block we're at: 7
+YFS      iterating through block with dir entries
+YFS      This dir entry: .
+YFS      This dir entry: ..
+YFS      This dir entry: a
+YFS      location: 3
+YFS      creating folder or file b
+YFS      Name: b
+YFS      appending to parent
+YFS      parent size: 4
+YFS      creating/opening file
+YFS      Dir entry: 2 b
+YFS      0x22ae0
+YFS      Copied
+YFS      Inum to write to: 7
+YFS      In MKDIR inside YFS
+YFS      Path creating: /a
+YFS      Current inode we're at: 1
+YFS      Num dir entries: 4
+YFS      Looking in direct
+YFS      Current direct block we're at: 7
+YFS      iterating through block with dir entries
+YFS      This dir entry: .
+YFS      This dir entry: ..
+YFS      This dir entry: a
+YFS      FOUND FILE/FOLDER - file/folder num is 2
+YFS      ERROR: file already created!
+YFS      Created directory with this inum: -1
+YFS      Client pid: 3
+YFS      EXITING

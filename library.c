@@ -13,6 +13,7 @@ struct info_file{
     int fd;
     int open_close; // open = 1, close = 0;
 };
+
 struct info_file file_info_collection[MAX_OPEN_FILES];
 int lowest_fd;
 int current_inum = ROOTINODE;
@@ -117,8 +118,9 @@ int Seek(int fd, int offset, int whence) {
 }
 
 int Link(char *oldname, char *newname) {
-    (void) oldname;
-    (void) newname;
+    TracePrintf(0, "In Link\n");
+    struct my_msg test_message = {.type = LINK_M, .data1 = strlen(oldname), .data2 = current_inum, .data3 = strlen(newname), .ptr2 = (void *) newname, .ptr = (void *) oldname};
+    Send((void *) &test_message, -FILE_SERVER);
     return 0;
 }
 

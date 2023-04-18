@@ -15,4 +15,6 @@ main()
         printf("Link status %d\n", status);
 
         Shutdown();
+
+        return 0;
 }
