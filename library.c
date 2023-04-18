@@ -44,7 +44,7 @@ int Open(char *pathname) {
 
     //update the file descriptor.
     // message is overwritten
-    int curr_inode = test_message.data2; //inode of the current open file
+    int curr_inode = test_message.data3; //inode of the current open file
     int pos = 0;
     
 
@@ -93,7 +93,7 @@ int Create(char *pathname) {
     Send((void *) &test_message, -FILE_SERVER);
     
     //TODO Need to open file
-    int curr_inode = test_message.data2;
+    int curr_inode = test_message.data3;
     int pos = 0;
     int lowest_fd;
     if( (lowest_fd = find_lowest_fd()) == -1){
@@ -152,10 +152,28 @@ int Write(int fd, void *buf, int size) {
 }
 
 int Seek(int fd, int offset, int whence) {
-    (void) fd;
-    (void) offset;
-    (void) whence;
-    return 0;
+    TracePrintf(0, "in seek\n");
+    int new_cur_pos;
+    if (whence == SEEK_SET) {
+        new_cur_pos = 0 + offset;
+        file_info_collection[fd].pos = new_cur_pos;
+    } else if (whence == SEEK_CUR) {
+        new_cur_pos = file_info_collection[fd].pos + offset;
+    } else if (whence == SEEK_END) {
+        // Get size from node
+        struct my_msg test_message = {.type = SEEK_M, .data2 = file_info_collection[fd].inode};
+        Send((void *) &test_message, -FILE_SERVER);
+
+        new_cur_pos = test_message.data3 + offset;
+
+        // TODO: Handle when seek is beyond size
+    } else {
+        TracePrintf(0, "ERROR: Sent invalid whence\n");
+        new_cur_pos = -1;
+    }
+
+    file_info_collection[fd].pos = new_cur_pos;
+    return new_cur_pos;
 }
 
 int Link(char *oldname, char *newname) {
@@ -207,13 +225,11 @@ int ChDir(char *pathname) {
     Send((void *) &test_message, -FILE_SERVER);
 
     // Overriden, make old current dir the new one
-    current_inum = test_message.data2;
+    current_inum = test_message.data3;
+    TracePrintf(0, "%d\n", test_message.data3);
+    TracePrintf(0, "Changed directory to this inode: %d\n", current_inum);
 
-    if (current_inum >= 0) {
-        return 0;
-    } else {
-        return ERROR;
-    }
+    return test_message.data2;
 }
 
 int Stat(char *pathname, struct Stat *statbuf) {
@@ -223,11 +239,7 @@ int Stat(char *pathname, struct Stat *statbuf) {
     // add pointer to stat buf inside data3
     Send((void *) &test_message, -FILE_SERVER);
 
-    if (test_message.data2 == 0) {
-        return 0;
-    } else {
-        return ERROR;
-    }
+    return test_message.data2;
 }
 
 int Sync(void) {

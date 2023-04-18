@@ -558,7 +558,7 @@ main(int argc, char **argv)
                     
                     blockToLookIn = 0;
                     //need additional block... write definition says that you reached end of the file 
-                    if (positi)
+                    // if (positi)
 
 
                     //testing if greater than size of all bytes/size of file!
@@ -666,6 +666,11 @@ main(int argc, char **argv)
 
                     TracePrintf(0, "End of READ File");
                 case SEEK_M:
+                    TracePrintf(0, "in Seek inside YFS");
+                    // Return size
+                    struct inode *this_inode = (struct inode *) (first_block + message->data2 * sizeof(struct inode));
+                    inum_result = this_inode->size;
+                    break;
                 case LINK_M:
                     TracePrintf(0, "in LINK inside YFS");
                     // Pathname = oldname, pathname2 = newname
@@ -845,6 +850,7 @@ main(int argc, char **argv)
             // Clean up data
             reply_message.data1 = message_type;
             reply_message.data2 = reply_result;
+            reply_message.data3 = inum_result;
             memset(&pathname, '\0', MAXPATHNAMELEN);
             Reply((void *) &reply_message, client_pid);
 
