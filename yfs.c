@@ -459,7 +459,7 @@ main(int argc, char **argv)
 
 
                     
-
+                    break;
 
                     
                      
@@ -489,6 +489,15 @@ main(int argc, char **argv)
                             return ERROR;
                     }
 
+
+
+                    // return inode...
+                    //if(DIRECT_BLOCKS )
+
+                    // return inode... 
+
+                
+
                     curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
                     TracePrintf(3, " current_position: %d", current_position);
                     
@@ -496,7 +505,9 @@ main(int argc, char **argv)
 
                     TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE - 1);
                     
-                    //direct blocks
+                   
+
+                    // block to look in
                     blockToLookIn = (int) current_position / BLOCKSIZE - 1;
                     TracePrintf(3, " block it's in: %d", blockToLookIn);
                     if(blockToLookIn < NUM_DIRECT)
@@ -508,7 +519,48 @@ main(int argc, char **argv)
                         TracePrintf(0, "Position to Read is in Indirect Blocks");
                     }
 
-                    positionInBlock = current_position % BLOCKSIZE;
+                    positionInBlock = current_position % BLOCKSIZE; 
+                     //direct blocks
+                    
+                    blockToLookIn = 0;
+                   
+                    //you need new block
+                    if (positionInBlock + number_to_write < BLOCKSIZE) 
+                    {
+                        // omplicated case
+
+                        // depending on number of blocks you need, get one, or two...
+                        
+                    }
+                    else{
+                        // just write in block
+                         if ((c = ReadSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
+                            //free(current_block);
+                            return ERROR;
+                        }
+
+                        // EDIT Current Block
+                        //number of bytes to read in the block --> current block pointer
+                        // block To Read. memcpy into the buffer for receiving.
+                        //CopyTo(current_block + positionInBlock, blockToRead, number_to_read);
+                        CopyFrom(client_pid, current_block + positionInBlock, buf_writeTo, number_to_write);
+
+                        if ((c = WriteSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
+                            free(current_block);
+                            return ERROR;
+                        }
+
+                        
+                    }
+/*************************** This is Old Code */
+                    /**                   */
+                     //direct blocks
+                    
+                    blockToLookIn = 0;
+                    //need additional block... write definition says that you reached end of the file 
+                    if (positi)
+
+
                     //testing if greater than size of all bytes/size of file!
                     if( (current_position % BLOCKSIZE) + number_to_write < curr_inode->size)
                     {
@@ -534,21 +586,7 @@ main(int argc, char **argv)
                         TracePrintf(0, "Read Normally in First Case");
                         //assert(number)
                         //Read the Direct i normally
-                        if ((c = ReadSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
-                            //free(current_block);
-                            return ERROR;
-                        }
-
-                        // EDIT Current Block
-                        //number of bytes to read in the block --> current block pointer
-                        // block To Read. memcpy into the buffer for receiving.
-                        //CopyTo(current_block + positionInBlock, blockToRead, number_to_read);
-                        CopyFrom(client_pid, current_block + positionInBlock, buf_writeTo, number_to_write);
-
-                        if ((c = WriteSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
-                            free(current_block);
-                            return ERROR;
-                        }
+                       
 
                     }
                     //case 2
@@ -624,7 +662,7 @@ main(int argc, char **argv)
                     }
 
                     free(current_block);
-                   
+                    break;
 
                     TracePrintf(0, "End of READ File");
                 case SEEK_M:
