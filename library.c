@@ -125,7 +125,9 @@ int Link(char *oldname, char *newname) {
 }
 
 int Unlink(char *pathname) {
-    (void) pathname;
+    TracePrintf(0, "In unlink\n");
+    struct my_msg test_message = {.type = UNLINK_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
     return 0;
 }
 
