@@ -44,7 +44,7 @@ int Open(char *pathname) {
 
     //update the file descriptor.
     // message is overwritten
-    int curr_inode = test_message.data1; //inode of the current open file
+    int curr_inode = test_message.data2; //inode of the current open file
     int pos = 0;
     
 
@@ -65,19 +65,22 @@ int Open(char *pathname) {
     file_info_collection[lowest_fd].open_close = 1;
     
 
-    return 0;
+    return lowest_fd;
 }
 
 int Close(int fd) {
-    int curr_inode = file_info_collection[fd].inode;
+    // int curr_inode = file_info_collection[fd].inode;
     /** data1: inode number server*/
-    struct my_msg test_message = {.type = CLOSE_M, .data1 = curr_inode};
+    // struct my_msg test_message = {.type = CLOSE_M, .data1 = curr_inode};
     
-    Send((void *) &test_message, -FILE_SERVER);
+    // Send((void *) &test_message, -FILE_SERVER);
 
     file_info_collection[fd].inode = 0;
     file_info_collection[fd].pos = 0;
     file_info_collection[fd].fd = lowest_fd;
+    if (file_info_collection[fd].open_close == 0) {
+        return ERROR;
+    }
     file_info_collection[fd].open_close = 0;
 
     TracePrintf(0, "In close\n");
@@ -89,7 +92,24 @@ int Create(char *pathname) {
     struct my_msg test_message = {.type = CREATE_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     
-    //TODO Need to open file 
+    //TODO Need to open file
+    int curr_inode = test_message.data2;
+    int pos = 0;
+    int lowest_fd;
+    if( (lowest_fd = find_lowest_fd()) == -1){
+        TracePrintf(0, "Unable to create more files than file descriptors");
+        return -1;
+    }
+    //chcek the entry, and create the struct at the least/lowest file descriptor num
+  
+    //update bookkeeping
+    // file_info_collection[lowest_fd] = malloc( sizeof(struct info_file) );
+    
+    file_info_collection[lowest_fd].inode = curr_inode;
+    file_info_collection[lowest_fd].pos = pos;
+    file_info_collection[lowest_fd].fd = lowest_fd;
+    //file_info_collection[lowest_fd] = {.inode = curr_inode, .pos = pos, .fd = lowest_fd};
+    file_info_collection[lowest_fd].open_close = 1;
 
     return 0;
 }
@@ -121,12 +141,14 @@ int Link(char *oldname, char *newname) {
     TracePrintf(0, "In Link\n");
     struct my_msg test_message = {.type = LINK_M, .data1 = strlen(oldname), .data2 = current_inum, .data3 = strlen(newname), .ptr2 = (void *) newname, .ptr = (void *) oldname};
     Send((void *) &test_message, -FILE_SERVER);
-    return 0;
+    return test_message.data2;
 }
 
 int Unlink(char *pathname) {
-    (void) pathname;
-    return 0;
+    TracePrintf(0, "In unlink\n");
+    struct my_msg test_message = {.type = UNLINK_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
+    Send((void *) &test_message, -FILE_SERVER);
+    return test_message.data2;
 }
 
 int SymLink(char *oldname, char *newname) {
@@ -147,7 +169,7 @@ int MkDir(char *pathname) {
     struct my_msg test_message = {.type = MKDIR_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     
-    return 0;
+    return test_message.data2;
 }
 
 int RmDir(char *pathname) {
@@ -166,7 +188,11 @@ int ChDir(char *pathname) {
     // Overriden, make old current dir the new one
     current_inum = test_message.data2;
 
-    return 0;
+    if (current_inum >= 0) {
+        return 0;
+    } else {
+        return ERROR;
+    }
 }
 
 int Stat(char *pathname, struct Stat *statbuf) {
@@ -176,7 +202,11 @@ int Stat(char *pathname, struct Stat *statbuf) {
     // add pointer to stat buf inside data3
     Send((void *) &test_message, -FILE_SERVER);
 
-    return 0;
+    if (test_message.data2 == 0) {
+        return 0;
+    } else {
+        return ERROR;
+    }
 }
 
 int Sync(void) {

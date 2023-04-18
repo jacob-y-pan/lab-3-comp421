@@ -27,6 +27,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
 struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent_inum, int append, int link_inum);
 int open_file_inode(struct dir_entry *this_dir_entry);
 int remove_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, int this_index, void *this_block, int direct_indirect);
+int unlink_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, int this_index, void *this_block, int direct_indirect);
 
 // Helper Functions
 
@@ -166,6 +167,7 @@ main(int argc, char **argv)
             char first_char;
             char *token;
             int inum_result;
+            int reply_result;
             // Message to reply back with
             struct my_msg reply_message;
 
@@ -202,8 +204,12 @@ main(int argc, char **argv)
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     }
 
+                    reply_result = inum_result;
+
                     break;
                 case CLOSE_M:
+                    // Do nothing because should not get close_m
+                    break;
                 case CREATE_M:
                     // Try creating now
                     TracePrintf(0, "In CREATE inside YFS\n");
@@ -226,6 +232,8 @@ main(int argc, char **argv)
                     if ((c = ReadSector(1, (void *) first_block)) == ERROR) {
                         return ERROR;
                     }
+
+                    reply_result = inum_result;
 
                     // // Begin at root node
                     // if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
@@ -284,10 +292,10 @@ main(int argc, char **argv)
 
                     // READ message: Specific data fields --> data1 (inode number), data2 (read number), data3 (position of the file),
                     // ptr (buffer to read)
-                    inode_check = (int) message->data1;
-                    number_to_read = (int) message->data2;
-                    current_position = (int) message->data3;
-                    buf_readTo = (void *) message->ptr;
+                    // inode_check = (int) message->data1;
+                    // number_to_read = (int) message->data2;
+                    // current_position = (int) message->data3;
+                    // buf_readTo = (void *) message->ptr;
 
                     TracePrintf(0, "Reading file with inode num %d", inode_check);
                     TracePrintf(0, "Amount to Read %d", number_to_read);
@@ -302,7 +310,11 @@ main(int argc, char **argv)
                     
                     void *current_block = malloc(BLOCKSIZE);
 
-                    TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE - 1);
+                    TracePrintf(0, "Current direct : %d\n", );
+                    
+                     struct inode *curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
+                    TracePrintf(3, " current_position: %d", current_position);
+                    
                     
                     //direct blocks
                     int blockToLookIn = (int) current_position / BLOCKSIZE - 1;
@@ -316,6 +328,18 @@ main(int argc, char **argv)
                         TracePrintf(0, "Position to Read is in Indirect Blocks");
                     }
 
+                    // TracePrintf(0, "Reading file with inode num %d", inode_check);
+                    // TracePrintf(0, "Amount to Read %d", number_to_read);
+                    // read bugffer + size, to check
+
+                    
+                    first_block = malloc(BLOCKSIZE);
+                    //if(... //READ INB BLOCK SIZES -->)
+                   
+
+
+                    TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE - 1);
+                    // TracePrintf(0, "Current direct : %d\n", );
                     int positionInBlock = current_position % BLOCKSIZE;
                     //testing if greater than size of all bytes/size of file!
                     if( (current_position % BLOCKSIZE) + number_to_read < curr_inode->size)
@@ -359,7 +383,7 @@ main(int argc, char **argv)
                         int readFirstBlock = BLOCKSIZE - positionInBlock;
                          //Read the Direct i normally
                         if ((c = ReadSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
-                            free(current_block);
+                            free(current_block); 
                             return ERROR;
                         }
     
@@ -384,18 +408,14 @@ main(int argc, char **argv)
 
                         CopyTo(client_pid, buf_readTo, readBuffer,number_to_read);
 
+
                     }
                     else{
                         
-                        // read the Indirect Block for Guidance
-                        
-                        if ((c = ReadSector((int) curr_inode->indirect, current_block)) == ERROR) {
-                            //free(current_block);
-                            return ERROR;
-                        }
 
-                        // actual number of blocks?
-                        int blockIndirect = blockToLookIn - NUM_DIRECT;
+                    //indirect blocks
+                    int j = 0;
+                    for(j = 0; )
 
                         int *indirect_inum = (int *) (NUM_DIRECT + blockIndirect * sizeof(int));
                         (void) indirect_inum;
@@ -406,11 +426,20 @@ main(int argc, char **argv)
                             return ERROR;
                         }
 
-                        //position in Block correlates to the actual byte number
-                        CopyTo(client_pid, buf_readTo, current_block + positionInBlock, number_to_read);
-                       
-                    }
-                   
+
+                        // actual number of blocks?
+                        int blockIndirect = blockToLookIn - NUM_DIRECT;
+
+                        int *indirect_inum = (int *) (current_block + blockIndirect * sizeof(int));
+                        (void) indirect_inum;
+                        //TODO?
+                        //current Block is actually pointing to the block of indirect Bloock!
+                        if ((c = ReadSector(blockIndirect, current_block)) == ERROR) {
+                            free(current_block);
+                            return ERROR;
+                        }
+
+                    } 
 
                     TracePrintf(0, "End of READ File");
                     
@@ -624,8 +653,39 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 2, inum_result);
                         TracePrintf(1, "Opened old file at this inum: %d\n", inum_result);
                     }
+
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
+                    
                     break;
                 case UNLINK_M:
+                    TracePrintf(0, "In UNLINK inside YFS\n");
+                    // Copy the pathname
+                    CopyFrom(client_pid, (void *) &pathname, message->ptr, (int) message->data1);
+                    // Now have pathname, try to remove into the right folder
+                    first_char = pathname[0];
+                    token = strtok(pathname, "/");
+
+                    // Use mode 7 to unlink
+                    // Absolute path
+                    if (first_char == '/') {
+                        inum_result = check_folder(ROOTINODE, token, ROOTINODE, 7, 0);
+                        TracePrintf(0, "Unlinked file with status: %d\n", inum_result);
+                    } else { // relative
+                        inum_result = check_folder(message->data2, token, message->data2, 7, 0);
+                        TracePrintf(0, "Unlinked file with status: %d\n", inum_result);
+                    }
+
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
+
+                    break;
                 case READLINK_M:
                 case MKDIR_M:
                     // TODO: Add '.' if have / at the end
@@ -646,6 +706,12 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 4, 0);
                         TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
                     }
+
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
                     break;
                 case RMDIR_M:
                     TracePrintf(0, "In RMDIR inside YFS\n");
@@ -663,6 +729,12 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 5, 0);
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     }
+
+                    if (inum_result > 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
                     break;
                 case CHDIR_M:
                     TracePrintf(0, "In CHDIR inside YFS\n");
@@ -672,7 +744,6 @@ main(int argc, char **argv)
                     first_char = pathname[0];
                     token = strtok(pathname, "/");
                     // Absolute path
-                    int inum_result;
                     if (first_char == '/') {
                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 6, 0);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
@@ -680,7 +751,6 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 6, 0);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
                     }
-                    reply_message.data2 = inum_result;
                     break;
                 case STAT_M:
                     TracePrintf(0, "In STAT inside YFS\n");
@@ -709,6 +779,11 @@ main(int argc, char **argv)
                     struct Stat *client_buffer = (struct Stat *) message->ptr2;
                     CopyTo(client_pid, (void *) client_buffer, &statbufholder, sizeof(statbufholder));
 
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
                     break;
                 case SYNC_M:
                 case SHUTDOWN_M:
@@ -724,6 +799,8 @@ main(int argc, char **argv)
             }
 
             // Clean up data
+            reply_message.data1 = message_type;
+            reply_message.data2 = reply_result;
             memset(&pathname, '\0', MAXPATHNAMELEN);
             Reply((void *) &reply_message, client_pid);
 
@@ -870,6 +947,16 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
                             free(current_block);
                             free(temp_pathname);
                             return curr_dir_entry->inum;
+                        } else if (mode == 7) {
+                            TracePrintf(0, "Unlinking this file\n");
+                            free(current_block);
+                            free(temp_pathname);
+                            return unlink_inode(curr_inode, curr_dir_entry, i, current_block, 1);
+                        } else {
+                            TracePrintf(0, "ERROR: No action for this dir_entry!\n");
+                            free(current_block);
+                            free(temp_pathname);
+                            return ERROR;
                         }
                         
                     }
@@ -1005,12 +1092,24 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
                             return temp;
                         }
                     } else if (mode == 6) {
-                            TracePrintf(0, "Switching to this inode\n");
-                            free(indirect_block);
-                            free(temp_pathname);
-                            free(indirect_block_block);
-                            return curr_dir_entry->inum;
-                        }
+                        TracePrintf(0, "Switching to this inode\n");
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return curr_dir_entry->inum;
+                    } else if (mode == 7) {
+                        TracePrintf(0, "Unlinking this file\n");
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return unlink_inode(curr_inode, curr_dir_entry, *indirect_inum, indirect_block_block, 0);
+                    } else {
+                        TracePrintf(0, "ERROR: No action for this dir_entry!\n");
+                        free(indirect_block);
+                        free(temp_pathname);
+                        free(indirect_block_block);
+                        return ERROR;
+                    }
                     
                 } 
             }
@@ -1242,4 +1341,43 @@ int remove_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, i
     TracePrintf(0, "Finished removing\n");
 
     return 0;
+}
+
+int unlink_inode(struct inode *parent_inode, struct dir_entry *this_dir_entry, int this_index, void *this_block, int direct_indirect) {
+    struct inode *this_inode = (struct inode *) (first_block + this_dir_entry->inum * sizeof(struct inode));
+
+    if (this_inode->type == INODE_REGULAR) { // Check is file and not directory
+        
+        this_inode->nlink -= 1;
+        if (this_inode->nlink == 0) { // Delete this file
+            // TODO: Just free inode?
+            free_inodes[this_dir_entry->inum] = 0;
+        }
+        
+        // remove directory entry
+        this_dir_entry->inum = 0;
+        memset(this_dir_entry->name, '\0', DIRNAMELEN);
+
+        // Removed directory entry, write to block
+        int block_num;
+        if (direct_indirect == 1) {
+            block_num = parent_inode->direct[this_index];
+        } else {
+            block_num = this_index;
+        }
+        if ((c = WriteSector(block_num, this_block)) == ERROR) {
+            return ERROR;
+        }
+
+
+        // Changed file_node, write to block
+        if ((c = WriteSector(1, first_block)) == ERROR) {
+            return ERROR;
+        }
+
+        return 0;
+    } else {
+        TracePrintf(0, "ERROR: Needs to be file type, not directory!\n");
+        return ERROR;
+    }
 }
