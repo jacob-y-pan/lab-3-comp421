@@ -167,6 +167,7 @@ main(int argc, char **argv)
             char first_char;
             char *token;
             int inum_result;
+            int reply_result;
             // Message to reply back with
             struct my_msg reply_message;
             switch (message_type) {
@@ -194,8 +195,12 @@ main(int argc, char **argv)
                         TracePrintf(0, "opened file at this inum: %d\n", inum_result);
                     }
 
+                    reply_result = inum_result;
+
                     break;
                 case CLOSE_M:
+                    // Do nothing because should not get close_m
+                    break;
                 case CREATE_M:
                     // Try creating now
                     TracePrintf(0, "In CREATE inside YFS\n");
@@ -218,6 +223,8 @@ main(int argc, char **argv)
                     if ((c = ReadSector(1, (void *) first_block)) == ERROR) {
                         return ERROR;
                     }
+
+                    reply_result = inum_result;
 
                     // // Begin at root node
                     // if (pathname[0] == '/' || current_inode_directory == ROOTINODE) {
@@ -425,6 +432,13 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 2, inum_result);
                         TracePrintf(1, "Opened old file at this inum: %d\n", inum_result);
                     }
+
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
+                    
                     break;
                 case UNLINK_M:
                     TracePrintf(0, "In UNLINK inside YFS\n");
@@ -443,6 +457,13 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 7, 0);
                         TracePrintf(0, "Unlinked file with status: %d\n", inum_result);
                     }
+
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
+
                     break;
                 case READLINK_M:
                 case MKDIR_M:
@@ -464,6 +485,12 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 4, 0);
                         TracePrintf(0, "opened directory at this inum: %d\n", inum_result);
                     }
+
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
                     break;
                 case RMDIR_M:
                     TracePrintf(0, "In RMDIR inside YFS\n");
@@ -481,6 +508,12 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 5, 0);
                         TracePrintf(0, "Removed directory with status: %d\n", inum_result);
                     }
+
+                    if (inum_result > 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
                     break;
                 case CHDIR_M:
                     TracePrintf(0, "In CHDIR inside YFS\n");
@@ -490,7 +523,6 @@ main(int argc, char **argv)
                     first_char = pathname[0];
                     token = strtok(pathname, "/");
                     // Absolute path
-                    int inum_result;
                     if (first_char == '/') {
                         inum_result = check_folder(ROOTINODE, token, ROOTINODE, 6, 0);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
@@ -498,7 +530,6 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 6, 0);
                         TracePrintf(0, "Changed directory with status: %d\n", inum_result);
                     }
-                    reply_message.data2 = inum_result;
                     break;
                 case STAT_M:
                     TracePrintf(0, "In STAT inside YFS\n");
@@ -527,6 +558,11 @@ main(int argc, char **argv)
                     struct Stat *client_buffer = (struct Stat *) message->ptr2;
                     CopyTo(client_pid, (void *) client_buffer, &statbufholder, sizeof(statbufholder));
 
+                    if (inum_result >= 0) {
+                        reply_result = 0;
+                    } else {
+                        reply_result = ERROR;
+                    }
                     break;
                 case SYNC_M:
                 case SHUTDOWN_M:
@@ -542,6 +578,8 @@ main(int argc, char **argv)
             }
 
             // Clean up data
+            reply_message.data1 = message_type;
+            reply_message.data2 = reply_result;
             memset(&pathname, '\0', MAXPATHNAMELEN);
             Reply((void *) &reply_message, client_pid);
 
