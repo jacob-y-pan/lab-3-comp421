@@ -963,9 +963,13 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
 
         int j;
         TracePrintf(0, "iterating through block with dir entries\n");
-        for (j = 0; j < num_dir_entries; j++) {
+        for (j = 0; j < BLOCKSIZE / (int) sizeof(struct dir_entry); j++) {
             // If went past the num_dir_entries in total, didn't find it
             if (curr_dir_index >= num_dir_entries) {
+                // if create, break the loop and append
+                if (mode == 2 || mode == 4) {
+                    break;
+                }
                 free(current_block);
                 free(temp_pathname);
                 return ERROR;
@@ -1152,9 +1156,13 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
             return ERROR;
         }
         int j;
-        for (j = 0; j < num_dir_entries; j++) {
+        for (j = 0; j < (int) sizeof(struct dir_entry); j++) {
             // If went past the num_dir_entries in total, didn't find it
             if (curr_dir_index >= num_dir_entries) {
+                // if create, break the loop and append
+                if (mode == 2 || mode == 4) {
+                    break;
+                }
                 free(indirect_block);
                 free(temp_pathname);
                 free(indirect_block_block);
