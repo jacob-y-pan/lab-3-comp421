@@ -77,7 +77,7 @@ main(int argc, char **argv)
         // Init free blocks - since concerned about only data blocks, just subtract those
         // 0 = free 1 = not free -1 = never can be free
         // free_blocks = (int *) malloc(sizeof(int) * (num_blocks - num_blocks_for_inodes));
-        num_data_blocks = num_blocks - num_blocks_for_inodes;
+        num_data_blocks = num_blocks - num_blocks_for_inodes; //possible error
         int arr_free_blocks[num_data_blocks];
         arr_free_blocks[0] = -1;
         arr_free_blocks[1] = -1;
@@ -481,22 +481,12 @@ main(int argc, char **argv)
                     TracePrintf(0, "Amount to Write %d", number_to_read);
                     // read bugffer + size, to check
 
-                    
-
+    
                     first_block = malloc(BLOCKSIZE);
                     if ((c = ReadSector(1, first_block)) == ERROR) {
                             //free(current_block);bl
                             return ERROR;
                     }
-
-
-
-                    // return inode...
-                    //if(DIRECT_BLOCKS )
-
-                    // return inode... 
-
-                
 
                     curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
                     TracePrintf(3, " current_position: %d", current_position);
@@ -504,9 +494,6 @@ main(int argc, char **argv)
                     current_block = malloc(BLOCKSIZE);
 
                     TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE - 1);
-                    
-                   
-
                     // block to look in
                     blockToLookIn = (int) current_position / BLOCKSIZE - 1;
                     TracePrintf(3, " block it's in: %d", blockToLookIn);
@@ -520,17 +507,109 @@ main(int argc, char **argv)
                     }
 
                     positionInBlock = current_position % BLOCKSIZE; 
-                     //direct blocks
+                    //direct blocks
                     
                     blockToLookIn = 0;
-                   
+                    // READ --> 
+                    blockToLookOut = 10;
+
+
                     //you need new block
-                    if (positionInBlock + number_to_write < BLOCKSIZE) 
+                    if ( (current_position + number_to_write > curr_inode->size) ) 
                     {
-                        // omplicated case
+                        // need more blocks
+                        if( (current_position + number_to_write  - curr_inode->size) < # diff in remaining block size)
+                        {
+                            // don't need more blocks
+                            // 
+                        }
+                        else{
+                            // Need more blocks                      
+                            // number of blocks needed:
+
+                            int endPosition = (int) (current_position + number_to_write  - curr_inode->size);
+                            //                               - (# bytes in last block)) / BLOCKSIZE;
+                            // number of direct blocks needed?
+                            if(current_position + number_to_write <= BLOCKSIZE * NUMDIRECT){
+                                //  might need more direct blocks.
+                                
+                                int number_direct = number_to_write + (current_position)
+                                            
+
+                            }else {
+                                //indirect blocks needed
+                                int INDIRECT_NEEDED = (int) (current_position 
+                                                + number_to_write - BLOCKSIZE * NUMDIRECT) / BLOCKSIZE;
+                            }
+                            int DIRECT_BLOCKS_USED = 0 ;
+                            
+
+                            // get the number of direct blocks
+                            int INDIRECT_BLOCKS = 0;
+
+                            // get number of direct blocks 
+                            int current_direct_block = (int) curr_inode->size / bEG;
+                            for()
+
+
+                            // if you need nmore direct blocks (by checking which direct block you're on)
+                            // then.. get indirect blocks
+                            for(int i = 0; i < NUM_XTRA_INDIRECT; i++) {
+
+                                //get one indirect block
+                                int indirectBlockForNode = get_free_indirect_block();
+                                curr_inode->indirect = find_free_block();
+                                if ((c = WriteSector(1, first_block)) == ERROR) {
+                                    free(temp_pathname);
+                                    return ERROR;
+                                }
+
+                                
+                                // get two indirect block
+                                int indirectBlock2ForNode = ..
+
+
+                                // Indiret Block --> 
+                                // Get Indirect Blocks
+
+                                // Get Free Indirect Blocks
+
+                                // write Into Indirect Block
+
+                                // ReadSector(indirectBlock2ForNode, ...)
+                                void *indirect_block_block = malloc(BLOCKSIZE);
+                                for (i = 0; i < BLOCKSIZE / (int) sizeof(int); i++) {
+                                    int *indirect_inum = (int *) (indirect_block + i * sizeof(int));
+                                }
+                                // write in another indirect block
+
+
+
+                                // write in indirect block
+
+                                // get memory.
+
+
+
+                            }
+                              
+
+                        }
+
+
+                        // Complicated case
+                        int num_blocks_needed  = (int) ( / BLOCKSIZE);
+                        // extra blocka
 
                         // depending on number of blocks you need, get one, or two...
                         
+                        // grab in the free_block_list; sort through; grab the first five extra blocks;
+                        if(num_blocks_needed > NUM_DIRECT)
+                        {
+                            int num_indirect_blocks = num_blocks_needed - NUM_DIRECT;
+
+            
+                        }
                     }
                     else{
                         // just write in block
