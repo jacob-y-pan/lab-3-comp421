@@ -118,6 +118,20 @@ int Read(int fd, void *buf, int size) {
     (void) fd;
     (void) buf;
     (void) size;
+   
+    struct my_msg test_message = {.type = READ_M, .data1 = file_info_collection[fd].inode, .data2 = size
+    , .data3 = file_info_collection[fd].pos, .ptr = buf};
+    Send((void *) &test_message, -FILE_SERVER);
+
+    //inode_check = (int) message->data1;
+    //number_to_read = (int) message->data2;
+    //current_position = (int) message->data3;
+    //buf_readTo = (void *) message->ptr;
+
+    //update message
+    //TODO
+
+
     TracePrintf(0, "in read\n");
     return 0;
 }
@@ -126,6 +140,13 @@ int Write(int fd, void *buf, int size) {
     (void) fd;
     (void) buf;
     (void) size;
+
+    struct my_msg test_message = {.type = WRITE_M, .data1 = file_info_collection[fd].inode, .data2 = size
+    , .data3 = file_info_collection[fd].pos, .ptr = buf};
+    Send((void *) &test_message, -FILE_SERVER);
+
+    //update TODO    
+
     TracePrintf(0, "in write\n");
     return 0;
 }
