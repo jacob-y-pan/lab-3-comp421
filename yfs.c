@@ -325,6 +325,7 @@ main(int argc, char **argv)
                         inum_result = check_folder(message->data2, token, message->data2, 2, inum_result);
                         TracePrintf(1, "Opened old file at this inum: %d\n", inum_result);
                     }
+                    break;
                 case UNLINK_M:
                 case READLINK_M:
                 case MKDIR_M:
