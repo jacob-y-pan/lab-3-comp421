@@ -936,160 +936,185 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
     for (i = 0; i < NUM_DIRECT; i++) {
         TracePrintf(0, "Looking in direct\n");
         if (curr_inode->direct[i] == 0) {
-            // Not a valid block -> we didn't find it. Return ERROR
+            // if create or mkdir, can allocate more space
+            if (mode == 2 || mode == 4) {
+                curr_inode->direct[i] = find_free_block();
+                // Write to inodes
+                if ((c = WriteSector(1, first_block)) == ERROR) {
+                    free(temp_pathname);
+                    return ERROR;
+                }
+
+            } else {
+                // Not a valid block -> we didn't find it. Return ERROR
+                TracePrintf(0, "Invalid block! Returning.\n");
+                free(temp_pathname);
+                return ERROR;
+            }
+        }
+        // Check this current direct block for our folder
+        void *current_block = malloc(BLOCKSIZE);
+        TracePrintf(0, "Current direct block we're at: %d\n", curr_inode->direct[i]);
+        if ((c = ReadSector((int) curr_inode->direct[i], current_block)) == ERROR) {
+            free(current_block);
             free(temp_pathname);
             return ERROR;
-        } else {
-            // Check this current direct block for our folder
-            void *current_block = malloc(BLOCKSIZE);
-            TracePrintf(0, "Current direct block we're at: %d\n", curr_inode->direct[i]);
-            if ((c = ReadSector((int) curr_inode->direct[i], current_block)) == ERROR) {
+        }
+
+        int j;
+        TracePrintf(0, "iterating through block with dir entries\n");
+        for (j = 0; j < num_dir_entries; j++) {
+            // If went past the num_dir_entries in total, didn't find it
+            if (curr_dir_index >= num_dir_entries) {
                 free(current_block);
                 free(temp_pathname);
                 return ERROR;
             }
-
-            int j;
-            TracePrintf(0, "iterating through block with dir entries\n");
-            for (j = 0; j < num_dir_entries; j++) {
-                // If went past the num_dir_entries in total, didn't find it
-                if (curr_dir_index >= num_dir_entries) {
+            curr_dir_index++;
+            struct dir_entry *curr_dir_entry = (struct dir_entry *) (current_block
+            + j * sizeof(struct dir_entry));
+            TracePrintf(0, "This dir entry: %s\n", curr_dir_entry->name);
+            // Compare entry with the current folder we're in
+            // Use strncmp because curr_dir_entry isn't null terminated
+            if (strncmp(curr_dir_entry->name, temp_pathname, strlen(temp_pathname)) == 0) {
+                // Match, recursively call if not file
+                if (reached_file == 0) {
+                    TracePrintf(0, "Found folder, recursively calling\n");
                     free(current_block);
                     free(temp_pathname);
-                    return ERROR;
-                }
-                curr_dir_index++;
-                struct dir_entry *curr_dir_entry = (struct dir_entry *) (current_block
-                + j * sizeof(struct dir_entry));
-                TracePrintf(0, "This dir entry: %s\n", curr_dir_entry->name);
-                // Compare entry with the current folder we're in
-                // Use strncmp because curr_dir_entry isn't null terminated
-                if (strncmp(curr_dir_entry->name, temp_pathname, strlen(temp_pathname)) == 0) {
-                    // Match, recursively call if not file
-                    if (reached_file == 0) {
-                        TracePrintf(0, "Found folder, recursively calling\n");
+                    return check_folder(curr_dir_entry->inum, curr_pathname, curr_inum, mode, link_inum);
+                } else {
+                    TracePrintf(0, "FOUND FILE/FOLDER - file/folder num is %d\n", curr_dir_entry->inum);
+                    if (mode == 1) { // we are opening the file
+                        TracePrintf(0, "OPening the file\n");
                         free(current_block);
                         free(temp_pathname);
-                        return check_folder(curr_dir_entry->inum, curr_pathname, curr_inum, mode, link_inum);
-                    } else {
-                        TracePrintf(0, "FOUND FILE/FOLDER - file/folder num is %d\n", curr_dir_entry->inum);
-                        if (mode == 1) { // we are opening the file
-                            TracePrintf(0, "OPening the file\n");
-                            free(current_block);
-                            free(temp_pathname);
-                            return open_file_inode(curr_dir_entry);
-                        } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
-                            TracePrintf(0, "File/directory already created! If is file, clear out\n");
-                            if (mode == 2) { // Is file, can work with it
-                                TracePrintf(0, "Truncating size to 0\n");
-                                struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
-                                if (file_inode->type == INODE_REGULAR) {
-                                    file_inode->size = 0;
-                                    free(current_block);
-                                    free(temp_pathname);
-                                    return curr_dir_entry->inum;
-                                }
-                            }
-                            free(current_block);
-                            free(temp_pathname);
-                            return ERROR;
-                        } else if (mode == 5) { // delete directory
+                        return open_file_inode(curr_dir_entry);
+                    } else if (mode == 2 || mode == 4) { // Found file/directory but already created, return error
+                        TracePrintf(0, "File/directory already created! If is file, clear out\n");
+                        if (mode == 2) { // Is file, can work with it
+                            TracePrintf(0, "Truncating size to 0\n");
                             struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
-                            if (file_inode->type == INODE_DIRECTORY) {
-                                TracePrintf(0, "Deleting the directory\n");
-                                int temp = remove_inode(curr_inode, curr_dir_entry, i, current_block, 1);
+                            if (file_inode->type == INODE_REGULAR) {
+                                file_inode->size = 0;
                                 free(current_block);
                                 free(temp_pathname);
-                                return temp;
+                                return curr_dir_entry->inum;
                             }
-                        } else if (mode == 6) {
-                            TracePrintf(0, "Switching to this inode\n");
-                            free(current_block);
-                            free(temp_pathname);
-                            return curr_dir_entry->inum;
-                        } else if (mode == 7) {
-                            TracePrintf(0, "Unlinking this file\n");
-                            free(current_block);
-                            free(temp_pathname);
-                            return unlink_inode(curr_inode, curr_dir_entry, i, current_block, 1);
-                        } else {
-                            TracePrintf(0, "ERROR: No action for this dir_entry!\n");
-                            free(current_block);
-                            free(temp_pathname);
-                            return ERROR;
                         }
-                        
-                    }
-                }
-
-                // if is last file in recursive function and we are creating file, check the dir_entry to see if empty
-                // If is create, edit
-                if (reached_file && (mode == 2 || mode == 4)) {
-                    // Only if we're still in the block we can append a dir_entry
-                    if (curr_dir_entry->inum == 0) {
-                        TracePrintf(0, "Something is empty, override it\n");
-                        struct dir_entry dir_entry_to_insert;
-                        if (mode == 2) { // create a file
-                            dir_entry_to_insert = create_file_dir(temp_pathname, 1, curr_inum, 0, link_inum);
-                        } else { // create a dir
-                            dir_entry_to_insert = create_file_dir(temp_pathname, 0, curr_inum, 0, link_inum);
-                        }
-                        TracePrintf(0, "does it print here first\n");
-                        // Change current dir entry to this one
-                        memcpy(curr_dir_entry, &dir_entry_to_insert, sizeof(struct dir_entry));
-                        // Write to disk
-                        if ((c = WriteSector((int) curr_inode->direct[i], current_block)) == ERROR) {
-                            free(current_block);
-                            free(temp_pathname);
-                            return ERROR;
-                        }
-                        TracePrintf(0, "does it print here third\n");
                         free(current_block);
                         free(temp_pathname);
-                        return dir_entry_to_insert.inum;
-                    } 
-                }
-                
-            }
-
-            // If is create, append
-            if (reached_file && (mode == 2 || mode == 4)) {
-                // Only if we're still in the block we can append a dir_entry
-                if (j * sizeof(struct dir_entry) < BLOCKSIZE) {
-                    TracePrintf(0, "location: %d\n", j);
-                    int old_j = j;
-                    struct dir_entry dir_entry_to_insert;
-                    if (mode == 2) { // create a file
-                        dir_entry_to_insert = create_file_dir(temp_pathname, 1, curr_inum, 1, link_inum);
-                    } else { // create a dir
-                        dir_entry_to_insert = create_file_dir(temp_pathname, 0, curr_inum, 1, link_inum);
-                    }
-                    TracePrintf(0, "Dir entry: %d %s\n", dir_entry_to_insert.inum, dir_entry_to_insert.name);
-                    // Change current dir entry to this one
-                    TracePrintf(0, "%p\n", current_block + old_j * sizeof(struct dir_entry));
-                    memcpy(current_block + old_j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
-                    // Write to disk
-                    TracePrintf(0, "Copied\n");
-                    TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
-                    if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
+                        return ERROR;
+                    } else if (mode == 5) { // delete directory
+                        struct inode *file_inode = (struct inode *) (first_block + curr_dir_entry->inum * sizeof(struct inode));
+                        if (file_inode->type == INODE_DIRECTORY) {
+                            TracePrintf(0, "Deleting the directory\n");
+                            int temp = remove_inode(curr_inode, curr_dir_entry, i, current_block, 1);
+                            free(current_block);
+                            free(temp_pathname);
+                            return temp;
+                        }
+                    } else if (mode == 6) {
+                        TracePrintf(0, "Switching to this inode\n");
+                        free(current_block);
+                        free(temp_pathname);
+                        return curr_dir_entry->inum;
+                    } else if (mode == 7) {
+                        TracePrintf(0, "Unlinking this file\n");
+                        free(current_block);
+                        free(temp_pathname);
+                        return unlink_inode(curr_inode, curr_dir_entry, i, current_block, 1);
+                    } else {
+                        TracePrintf(0, "ERROR: No action for this dir_entry!\n");
                         free(current_block);
                         free(temp_pathname);
                         return ERROR;
                     }
-
-                    free(current_block);
-                    free(temp_pathname);
-
-                    return dir_entry_to_insert.inum;
+                    
                 }
             }
-            
-            free(current_block);
+
+            // if is last file in recursive function and we are creating file, check the dir_entry to see if empty
+            // If is create, edit
+            if (reached_file && (mode == 2 || mode == 4)) {
+                // Only if we're still in the block we can append a dir_entry
+                if (curr_dir_entry->inum == 0) {
+                    TracePrintf(0, "Something is empty, override it\n");
+                    struct dir_entry dir_entry_to_insert;
+                    if (mode == 2) { // create a file
+                        dir_entry_to_insert = create_file_dir(temp_pathname, 1, curr_inum, 0, link_inum);
+                    } else { // create a dir
+                        dir_entry_to_insert = create_file_dir(temp_pathname, 0, curr_inum, 0, link_inum);
+                    }
+                    TracePrintf(0, "does it print here first\n");
+                    // Change current dir entry to this one
+                    memcpy(curr_dir_entry, &dir_entry_to_insert, sizeof(struct dir_entry));
+                    // Write to disk
+                    if ((c = WriteSector((int) curr_inode->direct[i], current_block)) == ERROR) {
+                        free(current_block);
+                        free(temp_pathname);
+                        return ERROR;
+                    }
+                    TracePrintf(0, "does it print here third\n");
+                    free(current_block);
+                    free(temp_pathname);
+                    return dir_entry_to_insert.inum;
+                } 
+            }
             
         }
+
+        // If is create, append
+        if (reached_file && (mode == 2 || mode == 4)) {
+            // Only if we're still in the block we can append a dir_entry
+            if (j * sizeof(struct dir_entry) < BLOCKSIZE) {
+                TracePrintf(0, "location: %d\n", j);
+                int old_j = j;
+                struct dir_entry dir_entry_to_insert;
+                if (mode == 2) { // create a file
+                    dir_entry_to_insert = create_file_dir(temp_pathname, 1, curr_inum, 1, link_inum);
+                } else { // create a dir
+                    dir_entry_to_insert = create_file_dir(temp_pathname, 0, curr_inum, 1, link_inum);
+                }
+                TracePrintf(0, "Dir entry: %d %s\n", dir_entry_to_insert.inum, dir_entry_to_insert.name);
+                // Change current dir entry to this one
+                TracePrintf(0, "%p\n", current_block + old_j * sizeof(struct dir_entry));
+                memcpy(current_block + old_j * sizeof(struct dir_entry), &dir_entry_to_insert, sizeof(struct dir_entry));
+                // Write to disk
+                TracePrintf(0, "Copied\n");
+                TracePrintf(0, "Inum to write to: %d\n", curr_inode->direct[i]);
+                if ((c = WriteSector(curr_inode->direct[i], current_block)) == ERROR) {
+                    free(current_block);
+                    free(temp_pathname);
+                    return ERROR;
+                }
+
+                free(current_block);
+                free(temp_pathname);
+
+                return dir_entry_to_insert.inum;
+            }
+        }
+        
+        free(current_block);
+            
     }
 
     // Didn't find it, now iterate through indirect block
+    // If indirect block is 0 and we want to create, allocate new block
+    if (curr_inode->indirect == 0) {
+        if (mode == 2 || mode == 4) {
+            TracePrintf(0, "Allocating for indirect block\n");
+            curr_inode->indirect = find_free_block();
+            if ((c = WriteSector(1, first_block)) == ERROR) {
+                free(temp_pathname);
+                return ERROR;
+            }
+        } else {
+            TracePrintf(0, "ERROR: Indirect block 0, cannot open\n");
+            return ERROR;
+        }
+    }
     void *indirect_block = malloc(BLOCKSIZE);
     if ((c = ReadSector((int) curr_inode->indirect, indirect_block)) == ERROR) {
         free(indirect_block);
@@ -1102,6 +1127,19 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
     for (i = 0; i < BLOCKSIZE / (int) sizeof(int); i++) {
         int *indirect_inum = (int *) (indirect_block + i * sizeof(int));
         if (*indirect_inum == 0) {
+            if (mode == 2 || mode == 4) {
+                TracePrintf(0, "Allocating for block inside indirect\n");
+                void *temp_p = indirect_block + i * sizeof(int);
+                int free_b = find_free_block();
+                memcpy(temp_p, &free_b, sizeof(int));
+                if ((c = WriteSector((int) curr_inode->indirect, indirect_block)) == ERROR) {
+                    free(temp_pathname);
+                    return ERROR;
+                }
+            } else {
+                TracePrintf(0, "ERROR: Indirect block 0, cannot open\n");
+                return ERROR;
+            }
             free(indirect_block);
             free(temp_pathname);
             free(indirect_block_block);

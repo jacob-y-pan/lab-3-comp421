@@ -213,10 +213,10 @@ int MkDir(char *pathname) {
 
 int RmDir(char *pathname) {
     TracePrintf(0, "In rmdir\n");
-    struct my_msg test_message = {.type = RMDIR_M, .data1 = strlen(pathname), .ptr = (void *) pathname};
+    struct my_msg test_message = {.type = RMDIR_M, .data1 = strlen(pathname), .data2 = current_inum, .ptr = (void *) pathname};
     Send((void *) &test_message, -FILE_SERVER);
     
-    return 0;
+    return test_message.data2;
 }
 
 int ChDir(char *pathname) {
@@ -226,7 +226,6 @@ int ChDir(char *pathname) {
 
     // Overriden, make old current dir the new one
     current_inum = test_message.data3;
-    TracePrintf(0, "%d\n", test_message.data3);
     TracePrintf(0, "Changed directory to this inode: %d\n", current_inum);
 
     return test_message.data2;
