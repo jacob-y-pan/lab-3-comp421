@@ -111,7 +111,7 @@ int Create(char *pathname) {
     //file_info_collection[lowest_fd] = {.inode = curr_inode, .pos = pos, .fd = lowest_fd};
     file_info_collection[lowest_fd].open_close = 1;
 
-    return 0;
+    return lowest_fd;
 }
 
 int Read(int fd, void *buf, int size) {
@@ -135,9 +135,6 @@ int Read(int fd, void *buf, int size) {
 }
 
 int Write(int fd, void *buf, int size) {
-    (void) fd;
-    (void) buf;
-    (void) size;
 
     struct my_msg test_message = {.type = WRITE_M, .data1 = file_info_collection[fd].inode, .data2 = size
     , .data3 = file_info_collection[fd].pos, .ptr = buf};
