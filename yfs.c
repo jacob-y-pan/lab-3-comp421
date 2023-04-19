@@ -379,7 +379,7 @@ main(int argc, char **argv)
                     break;
                 case WRITE_M:
                     //Writes at a specific file at the desired location.
-                     TracePrintf(0, "Inside the Write function");
+                     TracePrintf(0, "Inside the Write function\n");
 
                     // Reads a specific inode at the right time;
 
@@ -390,8 +390,8 @@ main(int argc, char **argv)
                     current_position = (int) message->data3;
                     buf_writeTo = (void *) message->ptr;
 
-                    TracePrintf(0, "Reading file with inode num %d", inode_check);
-                    TracePrintf(0, "Amount to Write %d", number_to_read);
+                    TracePrintf(0, "Writing file with inode num %d\n", inode_check);
+                    TracePrintf(0, "Amount to Write %d\n", number_to_write);
                     // read bugffer + size, to check
 
     
@@ -402,42 +402,90 @@ main(int argc, char **argv)
                     }
 
                     curr_inode = (struct inode *) (first_block + inode_check * sizeof(struct inode));
-                    TracePrintf(3, " current_position: %d", current_position);
+                    TracePrintf(0, " current_position: %d\n", current_position);
                     
                     current_block = malloc(BLOCKSIZE);
 
-                    TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE - 1);
+                    TracePrintf(0, "Current direct : %d\n", (int) current_position / BLOCKSIZE);
                     // block to look in
-                    blockToLookIn = (int) current_position / BLOCKSIZE - 1;
-                    TracePrintf(3, " block it's in: %d", blockToLookIn);
+                    blockToLookIn = (int) current_position / BLOCKSIZE;
+                    TracePrintf(0, " block it's in: %d\n", blockToLookIn);
                     if(blockToLookIn < NUM_DIRECT)
                     {
-                        TracePrintf(0, "Position to Read In Block is in Direct Blocks");
+                        TracePrintf(0, "Position to Read In Block is in Direct Blocks\n");
                     }
                     else
                     {
-                        TracePrintf(0, "Position to Read is in Indirect Blocks");
+                        TracePrintf(0, "Position to Read is in Indirect Blocks\n");
                     }
 
                     positionInBlock = current_position % BLOCKSIZE; 
                     //direct blocks
-                    
-                    blockToLookIn = 0;
-                    // READ --> 
-
 
                     //you need new block
+                    TracePrintf(0, "Size of file: %d\n", curr_inode->size);
+
+                    // Pointer to what we want to write
+                    char *buffer_holder = malloc(number_to_write);
+                    CopyFrom(client_pid, buffer_holder, buf_writeTo, number_to_write);
+
+                    TracePrintf(0, "Buffer: %s\n", buffer_holder);
+
+                    int bytes_to_write_counter = number_to_write;
                     if ( (current_position + number_to_write > curr_inode->size) ) 
                     {
-                        // need more blocks
-                        // # diff in remaining block size
-                        if( (current_position + number_to_write  - curr_inode->size) > 0 )
-                        {
-                            // don't need more blocks
-                            // 
+                        // Need more blocks      
+                        TracePrintf(0, "What we are writing is greater than size, need to increase size\n");
+                        if (curr_inode->size % BLOCKSIZE != 0) {  // we can use this last block
+                            void *block_to_write = malloc(BLOCKSIZE);
+                            if ((c = ReadSector(curr_inode->direct[blockToLookIn], block_to_write)) == ERROR) {
+                                free(block_to_write);
+                                return ERROR;
+                            }
+
+                            if ((c = ReadSector(curr_inode->direct[blockToLookIn], block_to_write)) == ERROR) {
+                                free(block_to_write);
+                                return ERROR;
+                            }
+                            free(block_to_write);
+                            blockToLookIn += 1;
+                        }     
+                        int num_blocks_needed = (int) number_to_write / BLOCKSIZE + 1;
+                        int i;
+                        TracePrintf(0, "Num blocks need: %d\n", num_blocks_needed);
+                        // go through direct blocks
+                        for (i = blockToLookIn; i < blockToLookIn+num_blocks_needed; i++) {
+                            if (i >= NUM_DIRECT) {
+                                // Need to get indirect block
+                                TracePrintf(0, "Needing to get indirect block\n");
+                                break;
+                            } else {
+                                TracePrintf(0, "Getting block for this size\n");
+                                int new_block_num = find_free_block();
+                                curr_inode->direct[i] = new_block_num;
+
+                                // Write as much as we can
+                                TracePrintf(0, "Writing now\n");
+                                // Use calloc because init'ing to 0
+                                void *block_to_write = calloc(BLOCKSIZE, 1);
+                                int min_to_write = BLOCKSIZE < number_to_write ? BLOCKSIZE : number_to_write;
+                                memcpy(block_to_write, buffer_holder, min_to_write);
+                                if ((c = WriteSector(curr_inode->direct[i], block_to_write)) == ERROR) {
+                                    free(block_to_write);
+                                    return ERROR;
+                                }
+
+                                bytes_to_write_counter -= min_to_write;
+
+                                free(block_to_write);
+                            }
                         }
-                        else{
-                            // // Need more blocks                      
+
+                        // Check if wrote everything: if did, return
+                        if (bytes_to_write_counter == 0) {
+                            TracePrintf(0, "Finished\n");
+                            return bytes_to_write_counter;
+                        }
                             // // number of blocks needed:
 
                             // int endPosition = (int) (current_position + number_to_write  - curr_inode->size);
@@ -512,9 +560,6 @@ main(int argc, char **argv)
 
 
                             // }
-                              
-
-                        }
 
 
                         // Complicated case
@@ -542,6 +587,7 @@ main(int argc, char **argv)
                         //number of bytes to read in the block --> current block pointer
                         // block To Read. memcpy into the buffer for receiving.
                         //CopyTo(current_block + positionInBlock, blockToRead, number_to_read);
+                        TracePrintf(0, "Writing now\n");
                         CopyFrom(client_pid, current_block + positionInBlock, buf_writeTo, number_to_write);
 
                         if ((c = WriteSector((int) curr_inode->direct[blockToLookIn], current_block)) == ERROR) {
@@ -915,6 +961,7 @@ int check_folder(int curr_inum, char *curr_pathname, int parent_inum, int mode, 
     int reached_file = 0;
     // Check that is directory type
     TracePrintf(0, "Current inode we're at: %d\n", curr_inum);
+    TracePrintf(0, "Current folder we're in: %s\n", temp_pathname);
     if (curr_inode->type != INODE_DIRECTORY) {
         // Not a directory
         return ERROR;
@@ -1316,7 +1363,7 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
     struct dir_entry null_entry = {.inum = -1, .name = ""};
     // throw error if filename > DIRNAMELEN
     if (strlen(actual_filename) > DIRNAMELEN) {
-        TracePrintf(3, "ERROR: Filename too long\n");
+        TracePrintf(0, "ERROR: Filename too long\n");
         return null_entry;
     }
     struct dir_entry entry_to_ins;
@@ -1366,6 +1413,8 @@ struct dir_entry create_file_dir(char *actual_filename, int file_dir, int parent
         struct dir_entry parent_entry = {.inum = parent_inum, .name = ".."};
         struct inode *parent_inode = (struct inode *) (first_block + parent_inum * sizeof(struct inode));
         parent_inode->nlink += 1;
+
+        TracePrintf(0, "Folder created: . inum: %d, .. inum: %d\n", this_entry.inum, parent_entry.inum);
 
         memcpy(temp_block_for_insert, &this_entry, sizeof(struct dir_entry));
         memcpy(temp_block_for_insert + sizeof(struct dir_entry), &parent_entry, sizeof(struct dir_entry));
