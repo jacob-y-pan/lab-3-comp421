@@ -443,7 +443,9 @@ main(int argc, char **argv)
                                 return ERROR;
                             }
 
-                            if ((c = ReadSector(curr_inode->direct[blockToLookIn], block_to_write)) == ERROR) {
+                            // TODO: Write to end of this block
+
+                            if ((c = WriteSector(curr_inode->direct[blockToLookIn], block_to_write)) == ERROR) {
                                 free(block_to_write);
                                 return ERROR;
                             }
@@ -486,6 +488,20 @@ main(int argc, char **argv)
                             TracePrintf(0, "Finished\n");
                             return bytes_to_write_counter;
                         }
+
+                        // If we have more bytes, write to the indirect block
+                        if (i >= NUM_DIRECT) {
+                            int indirect_block;
+                            if (curr_inode->indirect == 0) {
+                                indirect_block = find_free_block();
+                            } else {
+                                indirect_block = curr_inode->indirect;
+                            }
+
+                            // Loop through until reached the number of blocks needed
+                            
+                        }
+
                             // // number of blocks needed:
 
                             // int endPosition = (int) (current_position + number_to_write  - curr_inode->size);
